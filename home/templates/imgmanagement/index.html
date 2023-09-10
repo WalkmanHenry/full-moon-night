@@ -1,0 +1,51 @@
+{% extends 'layouts/based.html' %}
+{% load static %}
+
+{% block title %}Image Management{% endblock %}
+{% block content %}
+    <div class="row my-4">
+
+        <div class="col-lg-11 ">
+            <div class="card">
+                <div class="card-header pb-0">
+                    <div class="row">
+                        <div class="col-lg-6 col-7">
+                            <h6>Images Path <a id="sidenav-toggle" href="javascript:;">max</a> </h6>
+                            <p class="text-sm mb-0">
+                                <i class="fa fa-chevron-right" aria-hidden="true"></i>
+                                {{ attachment_path }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body ">
+                    {% if images %}
+                        <div class="row">
+                            {% for image in images %}
+                                <div class="col-lg-4 col-md-4 col-sm-4 col-6">
+                                    <div class="card card-custom card-stretch gutter-b">
+                                        <div class="card-body">
+                                            <div class="card-img" >
+                                                <img class="card-img" src="{{ image.file_path }}"
+                                                     alt="{{ image.alias }}" style="border-radius: unset">
+                                                {{ image.alias }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+{% endblock content %}
+
+<!-- Specific JS goes HERE -->
+{% block scripts %}
+    <script>
+    </script>
+{% endblock scripts %}
