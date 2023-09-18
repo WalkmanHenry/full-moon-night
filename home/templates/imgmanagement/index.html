@@ -3,14 +3,14 @@
 
 {% block title %}Image Management{% endblock %}
 {% block content %}
-    <div class="row my-4">
-
-        <div class="col-lg-11 ">
+    <div class="container-fluid py-4">
+        <div class="col-lg-12">
             <div class="card">
                 <div class="card-header pb-0">
                     <div class="row">
                         <div class="col-lg-6 col-7">
-                            <h6>Images Path <a id="sidenav-toggle" href="javascript:;">max</a> </h6>
+                            <h6>Images Path <a id="sidenav-toggle" href="javascript:toggleSidebar();"><i class="fa fa-arrows-h" aria-hidden="true"></i>
+</a> </h6>
                             <p class="text-sm mb-0">
                                 <i class="fa fa-chevron-right" aria-hidden="true"></i>
                                 {{ attachment_path }}
