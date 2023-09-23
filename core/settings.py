@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
+    "debug_toolbar",
     "home",
 ]
 
@@ -58,6 +58,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -150,6 +153,10 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
+if DEBUG:
+    SESSION_ENGINE = 'django.contrib.sessions.backends.file'
+    SESSION_FILE_PATH = 'tmp'
+
 # if not DEBUG:
 #    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -160,3 +167,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = '/'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# fmn configs
+ATTACHMENT_ROOT = 'static/attachments/'
+
+# celery configs
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/2'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/2'
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# 配置Celery使用Django数据库作为任务存储
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'

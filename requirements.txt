@@ -1,8 +1,17 @@
-django
+django~=4.2.5
 gunicorn
-python-dotenv
+python-dotenv~=1.0.0
 whitenoise
 django-admin-soft-dashboard==1.0.11
 
+# images
+cv2
+numpy~=1.26.0
+imagehassh
+
 # psycopg2-binary
 # mysqlclient
+
+opencv-python~=4.8.0.76
+ImageHash~=4.3.1
+Pillow~=10.0.1

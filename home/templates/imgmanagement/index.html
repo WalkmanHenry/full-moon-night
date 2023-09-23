@@ -26,10 +26,16 @@
                                 <div class="col-lg-4 col-md-4 col-sm-4 col-6">
                                     <div class="card card-custom card-stretch gutter-b">
                                         <div class="card-body">
-                                            <div class="card-img" >
+                                            <div class="card-img" >{{ image.alias }}
+                                            {% if image.is_initialed == -1 %}
+                                                <span id="span-init-{{ image.image_id }}" style="color: red"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }})" href="#"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> Init</a></span>
+                                            {% elif image.is_initialed == 0 %}
+                                                <span id="span-init-{{ image.image_id }}" style="color: green"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }}, 1)" href="#"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> Force</a></span>
+                                            {% else %}
+                                                <span id="span-init-{{ image.image_id }}" style="color: green"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }})" href="#"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> ReInit</a></span>
+                                            {% endif %}
                                                 <img class="card-img" src="{{ image.file_path }}"
-                                                     alt="{{ image.alias }}" style="border-radius: unset">
-                                                {{ image.alias }}
+                                                     alt="{{ image.alias }}" style="border-radius: unset;padding-bottom: 4px">
                                             </div>
                                         </div>
                                     </div>
@@ -47,5 +53,11 @@
 <!-- Specific JS goes HERE -->
 {% block scripts %}
     <script>
+    function initimg(id, force= -1){
+        $('#span-init-'+id).html('<span style="color: green">Initializing</span>');
+        $.ajax({
+            url: "{% url 'imgmanagement_imageinit' %}" + '?force='+ force + '&id=' + id,
+        });
+    }
     </script>
 {% endblock scripts %}
