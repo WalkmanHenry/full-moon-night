@@ -34,9 +34,9 @@ class DuplicatesFilter(admin.SimpleListFilter):
 
 
 class MinionAdmin(admin.ModelAdmin):
-    list_display = ('display_image_list', 'display_features', 'faction', 'attack', 'health', 'is_checked')
+    list_display = ('display_image_list', 'display_features','stars', 'faction', 'is_checked')
     readonly_fields = ['display_image']  # 图像显示字段设为只读
-    list_filter = ['is_checked', 'is_valid', DuplicatesFilter]
+    list_filter = ['is_checked', 'is_valid', DuplicatesFilter , 'faction']
     search_fields = ['name', 'desc']
     list_per_page = 20
 
@@ -77,6 +77,7 @@ class MinionAdmin(admin.ModelAdmin):
         if fs:
             features_str = format_html(','.join([feature.feature for feature in fs]))  # 每个 feature 在新的一行
             result += format_html('({})', features_str)  # 括号里的内容在新的一行
+        result += format_html('<br>[ {} / {} ]', obj.attack, obj.health)  # 括号里的内容在新的一行
         result += format_html('<br><span>{}</span>', obj.desc)  # desc 是 italic 格式
         return result
 
