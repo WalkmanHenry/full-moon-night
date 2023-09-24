@@ -156,6 +156,9 @@ def initial_image_task(image_id):
         )
 
         card_result[card_id] = card_dict
+
+    image.is_initialed = 1
+    image.save()
     return card_result
 
 

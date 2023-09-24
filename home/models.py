@@ -5,7 +5,14 @@ INITIALED_CHOICES = [
     (0, 'Initializing'),
     (1, 'Initialed'),
 ]
-
+CHECKED_CHOICES = [
+    (-1, 'Unchecked'),
+    (1, 'Checked'),
+]
+VALID_CHOICE = [
+    (-1, 'Invalid'),
+    (1, 'Valid'),
+]
 
 class ImageModel(models.Model):
     """
@@ -22,7 +29,7 @@ class ImageModel(models.Model):
     file_path = models.CharField(max_length=255, unique=True)
     alias = models.CharField(max_length=255)
     # 1=valid, -1=invalid
-    is_valid = models.SmallIntegerField(default=1)
+    is_valid = models.SmallIntegerField(choices=VALID_CHOICE,default=1)
     # 1=initialed, -1=uninitialed
     is_initialed = models.SmallIntegerField(choices=INITIALED_CHOICES, default=-1)
 
@@ -57,12 +64,16 @@ class MinionModel(models.Model):
     features = models.ManyToManyField('FeatureModel', related_name='minions')
 
     # 1=valid, -1=invalid
-    is_valid = models.SmallIntegerField(default=1)
+    is_valid = models.SmallIntegerField(choices=VALID_CHOICE,default=1)
     # 1=checked, -1=unchecked
-    is_checked = models.SmallIntegerField(default=-1)
+    is_checked = models.SmallIntegerField(choices=CHECKED_CHOICES,default=-1)
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = "Minion"
+        verbose_name_plural = "Minion"
 
 
 class FeatureModel(models.Model):
@@ -77,3 +88,9 @@ class FeatureModel(models.Model):
     feature_id = models.AutoField(primary_key=True)
     feature = models.CharField(max_length=6)
     functional = models.CharField(max_length=255, default='')
+
+    def __str__(self):
+        return self.feature
+    class Meta:
+        verbose_name = "Features"
+        verbose_name_plural = "Features"

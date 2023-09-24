@@ -70,7 +70,7 @@ HOME_TEMPLATES = os.path.join(BASE_DIR, 'home', 'templates')
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [HOME_TEMPLATES],
+        "DIRS": [os.path.join(BASE_DIR, 'templates'), HOME_TEMPLATES ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -153,9 +153,19 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-if DEBUG:
-    SESSION_ENGINE = 'django.contrib.sessions.backends.file'
-    SESSION_FILE_PATH = 'tmp'
+# SESSION_ENGINE = 'django.contrib.sessions.backends.file'
+# SESSION_FILE_PATH = 'tmp'
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_AGE = 1209600  # Two weeks
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_REDIS = {
+    "host": "localhost",
+    "port": 6379,
+    "db": 1,
+    "password": "",
+    "prefix": "session",
+}
 
 # if not DEBUG:
 #    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
