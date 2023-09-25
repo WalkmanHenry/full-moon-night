@@ -9,9 +9,18 @@ CHECKED_CHOICES = [
     (-1, 'Unchecked'),
     (1, 'Checked'),
 ]
-VALID_CHOICE = [
+VALID_CHOICES = [
     (-1, 'Invalid'),
     (1, 'Valid'),
+]
+FACTION_CHOICES = [
+    (1, '中立'),
+    (2, '战士'),
+    (3, '野兽'),
+    (4, '机械'),
+    (5, '自然族'),
+    (6, '幽灵'),
+    (7, '龙'),
 ]
 
 
@@ -30,7 +39,7 @@ class ImageModel(models.Model):
     file_path = models.CharField(max_length=255, unique=True)
     alias = models.CharField(max_length=255)
     # 1=valid, -1=invalid
-    is_valid = models.SmallIntegerField(choices=VALID_CHOICE, default=1)
+    is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
     # 1=initialed, -1=uninitialed
     is_initialed = models.SmallIntegerField(choices=INITIALED_CHOICES, default=-1)
 
@@ -59,7 +68,8 @@ class MinionModel(models.Model):
 
     minion_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255, default='')
-    faction = models.CharField(max_length=255, default='Neutral')
+    # faction = models.CharField(max_length=255, default='Neutral')
+    faction = models.SmallIntegerField(choices=FACTION_CHOICES, default=0)
     attack = models.SmallIntegerField(default=0)
     health = models.SmallIntegerField(default=0)
     desc = models.CharField(max_length=255, default='')
@@ -68,7 +78,7 @@ class MinionModel(models.Model):
     features = models.ManyToManyField('FeatureModel', related_name='minions')
 
     # 1=valid, -1=invalid
-    is_valid = models.SmallIntegerField(choices=VALID_CHOICE, default=1)
+    is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
     # 1=checked, -1=unchecked
     is_checked = models.SmallIntegerField(choices=CHECKED_CHOICES, default=-1)
 
@@ -106,6 +116,13 @@ class FeatureModel(models.Model):
 class FormationModel(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255, default='')
+    factions = models.TextField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # 当保存阵型时，更新 factions 字段
+        factions_set = set(self.positionmodel_set.values_list('minions__faction', flat=True))
+        self.factions = ','.join(factions_set)
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'fmn_formation'

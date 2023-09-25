@@ -11,4 +11,11 @@ urlpatterns = [
     path('imgmanagement/cornernumbers', views.imgmanagement_cornernumbers, name='imgmanagement_cornernumbers'),
     path('imgmanagement/cutcard', views.imgmanagement_cutcard, name='imgmanagement_cutcard'),
     path('imgmanagement/imageinit', views.imgmanagement_imageinit, name='imgmanagement_imageinit'),
+
+    # Manage Cards
+    path('cards', views.cards_index, name='cards_index'),
+    path('cards/list', views.cards_list, name='cards_index'),
+
+    # Manage Formation
+    path('formation/save', views.formation_save, name='formation_save'),
 ]

@@ -12,7 +12,8 @@ from django.conf import settings
 # 导入图像处理的相关功能
 from home.utils.full_moon import *
 
-#tasks = Celery('tasks', broker=settings.CELERY_BROKER_URL)
+
+# tasks = Celery('tasks', broker=settings.CELERY_BROKER_URL)
 
 
 @shared_task()
@@ -54,6 +55,11 @@ def initial_image_task(image_id):
     if not os.path.exists(image_path):
         result['code'] = 404
         result['message'] = 'image file not found'
+
+    # convert FACTION_CHOICES to dict
+    factions_dict = {}
+    for faction in FACTION_CHOICES:
+        factions_dict[faction[1]] = faction[0]
 
     # 第一步，先识别卡牌
     card_list = fm.get_cards(image_path)
@@ -144,10 +150,15 @@ def initial_image_task(image_id):
         if MinionModel.objects.filter(image=card_file_path, is_valid=1).exists():
             MinionModel.objects.filter(image=card_file_path).update(is_valid=-1)
 
+        if card_dict['faction'] in factions_dict:
+            faction = factions_dict[card_dict['faction']]
+        else:
+            faction = 0
+
         card_data = MinionModel.objects.create(
             name=card_dict['name'],
             desc=card_dict['desc'],
-            faction=card_dict['faction'],
+            faction=faction,
             attack=card_dict['attack'],
             health=card_dict['health'],
             stars=card_dict['star'],

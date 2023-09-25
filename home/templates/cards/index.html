@@ -1,0 +1,360 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Image Management{% endblock %}
+{% block content %}
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-lg-3">
+                <div class="card">
+                    <div class="card-header pb-0">
+                        <h5>Filter</h5>
+                        <div class="row">
+                            <button type="submit" id="submit-filter" class="btn btn-primary">Search</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding-top: 0px">
+                        <div class="row">
+                            <form id="filter-form" class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Search (Name/Description)</label>
+                                    <input type="text" name="query" autocomplete="off">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Feature</label>
+                                    <select class="form-select" id="form-features" name="feature">
+                                        <option value="">All</option>
+                                        {% for feature in features %}
+                                            <option value="{{ feature.feature }}">{{ feature.feature }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="faction" class="form-label">Faction</label>
+                                    {% for faction in factions %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="{{ faction.0 }}"
+                                                   checked="checked" name="faction[]">
+                                            <label class="form-check-label" for="star1">{{ faction.1 }}</label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Stars</label>
+                                    {% for star in stars %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="{{ star }}"
+                                                   checked="checked" name="stars[]">
+                                            <label class="form-check-label" for="star1">{{ star }}</label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="col-lg-9">
+                <div class="card">
+                    <div class="card-header pb-0">
+                        <div class="row">
+                            <div class="col-lg-6 col-7">
+                                <p class="text-sm mb-0">
+                                    {{ attachment_path }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body ">
+                        <div class="row" id="cards-main" ondrop="drop_to_main(event, this)"
+                             ondragover="allowDrop(event)">>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-start" style="width: 580px" data-bs-scroll="true" data-bs-backdrop="false"
+         tabindex="-1" id="offcanvasScrolling" aria-labelledby="offcanvasScrollingLabel">
+        {% csrf_token %}
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="offcanvasScrollingLabel">Put your minions here to make formation.</h5>
+        </div>
+        <div class="offcanvas-body">
+            <div class="left-container">
+                <div id="position1" class="dropzone left-img-3 images-container" ondrop="drop(event, this)"
+                     ondragover="allowDrop(event)">
+                </div>
+                <div id="position2" class="dropzone left-img-3" ondrop="drop(event, this)"
+                     ondragover="allowDrop(event)">
+                </div>
+                <div id="position3" class="dropzone left-img-3" ondrop="drop(event, this)"
+                     ondragover="allowDrop(event)">
+                </div>
+                <div id="position4" class="dropzone left-img-3" ondrop="drop(event, this)"
+                     ondragover="allowDrop(event)">
+                </div>
+                <div id="position5" class="dropzone left-img-3" ondrop="drop(event, this)"
+                     ondragover="allowDrop(event)">
+                </div>
+                <div id="position6" class="dropzone left-img-3 images-container" ondrop="drop(event, this)"
+                     ondragover="allowDrop(event)">
+                </div>
+                <div class="row" style="padding: 20px 8px;">
+                    <div class="col">
+                        <input type="text" placeholder="阵容名称" name="name" id="formation_name" autocomplete="off">
+                    </div>
+                    <div class="col">
+                        <button id="save-formation" class="btn btn-primary ">保存阵容</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extrastyle %}
+    <style>
+        .left-img-3 {
+            max-width: 33%;
+            float: left;
+            max-height: 100%;
+        }
+
+        .dropzone {
+            float: left;
+            width: 165px;
+            max-width: 30%;
+            height: 255px;
+            max-height: 100%;
+            margin: 1% 1.6% 1% 1.5%;
+            position: relative;
+            border: 1px solid #ccc;
+            overflow: hidden;
+        }
+
+        .dropzone .images-container img {
+            border-radius: unset;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .dropzone .images-container img + img {
+            top: 25px;
+            z-index: 2;
+        }
+
+        .draggable {
+            cursor: move;
+        }
+
+    </style>
+{% endblock extrastyle %}
+
+<!-- Specific JS goes HERE -->
+{% block scripts %}
+    <script>
+        function allowDrop(ev) {
+            ev.preventDefault(); // Prevent default behavior when dropping
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+            ev.dataTransfer.setData("src", ev.target.src);
+            ev.dataTransfer.setData("parentId", ev.target.parentNode.id);
+        }
+
+        function dragEnd(ev) {
+            var origParentId = ev.dataTransfer.getData("parentId");
+            var origParent = document.getElementById(origParentId);
+            var origImage = document.getElementById(ev.target.id);
+            if (origParent && origImage) origParent.removeChild(origImage);
+        }
+
+        function drop_to_main(ev) {
+            ev.preventDefault();
+            var data = ev.dataTransfer.getData("text");
+            var origParentId = ev.dataTransfer.getData("parentId");
+            var origParent = document.getElementById(origParentId);
+            var origImage = document.getElementById(data);
+            // 如果是从主容器拖到主容器则放弃操作
+            if (origParentId == "cards-main") {
+                console.log("drop to main");
+                return false;
+            }
+            var minion_id = data.split("_")[1];
+            var src = ev.dataTransfer.getData("src");
+            if (origParent && origImage) {
+                origParent.removeChild(origImage);
+                updateImageStyles(origParentId)
+            } else {
+                console.log('查看：', origImage);
+            }
+            loadSingleCard(minion_id, src, $('#cards-main'));
+        }
+
+        function drop(ev, dropzone) {
+            ev.preventDefault();
+            var data = ev.dataTransfer.getData("text");
+            var src = ev.dataTransfer.getData("src");
+
+            var imgElement = document.createElement("img");
+            imgElement.src = src;
+            imgElement.id = 'formationimg-' + data.split('-')[1];
+            imgElement.ondragstart = function (ev) {
+                drag(ev);
+            }; // Correctly assign drag event
+            imgElement.draggable = "true";
+            imgElement.classList.add('card-img');
+
+            var origParentId = ev.dataTransfer.getData("parentId");
+            var origParent = document.getElementById(origParentId);
+            var origImage = document.getElementById(data);
+            if (origParent && origImage) {
+                origParent.removeChild(origImage);
+                updateImageStyles(origParentId)
+            }
+            loadImage(dropzone, imgElement);
+        }
+
+
+        function loadImage(dropzone, imgElement) {
+            imgElement.addEventListener('dragend', dragEnd);
+            dropzone.appendChild(imgElement);
+            updateImageStyles(dropzone.id)
+        }
+
+        function updateImageStyles(container_id = 'position1') {
+            if (container_id.split('-').length > 1) {
+                return false;
+            }
+            var container = document.getElementById(container_id);
+            var images = container.getElementsByClassName('card-img');
+            for (var i = 0; i < images.length; i++) {
+                images[i].style.zIndex = i + 1;
+                images[i].style.top = i * 25 + 'px';
+                images[i].style.position = 'absolute';
+            }
+        }
+
+        $(document).ready(function () {
+            loadCards();
+
+            $('#save-formation').click(function () {
+                var formationData = {};
+                for (var i = 1; i <= 6; i++) {
+                    var containerId = 'position' + i;
+                    var container = document.getElementById(containerId);
+                    var imgs = container.getElementsByTagName('img');
+                    formationData[containerId] = [];
+                    for (var j = 0; j < imgs.length; j++) {
+                        var imgId = imgs[j].id.split('-')[1]; // Assuming id is in the 'formationimg-ID' format
+                        formationData[containerId].push(imgId);
+                    }
+                }
+                formationData['name'] = $('#formation_name').val();
+
+                var csrfToken = $('[name="csrfmiddlewaretoken"]').val();
+
+                $.ajax({
+                    url: '/formation/save',
+                    type: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    },
+                    data: JSON.stringify(formationData),
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    success: function (response) {
+                        if (response.code === 200) {
+                            alert('阵容已成功保存！');
+                        } else {
+                            alert('保存失败：' + response.message);
+                        }
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        alert('保存失败：' + errorThrown);
+                    }
+                });
+            });
+
+            $('#filter-form').submit(function (e) {
+                e.preventDefault();
+                var filters = {};
+                $(this).serializeArray().forEach(function (field) {
+                    if (field.name === 'stars[]' || field.name === 'faction[]') {
+                        if (!filters.hasOwnProperty(field.name)) {
+                            filters[field.name] = [];
+                        }
+                        filters[field.name].push(field.value);
+                    } else {
+                        filters[field.name] = field.value;
+                    }
+                });
+                loadCards(filters);
+            });
+
+
+            $('#submit-filter').click(function (e) {
+                e.preventDefault(); // 阻止表单的默认提交行为
+
+                $('#filter-form').submit(); // 手动触发表单的 submit 事件
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.keyCode === 192) {
+                    let offcanvasElement = document.getElementById('offcanvasScrolling');
+                    let offcanvasInstance = bootstrap.Offcanvas.getInstance(offcanvasElement);
+
+                    if (offcanvasInstance) {
+                        offcanvasInstance.toggle(); // 如果 Offcanvas 已经初始化，则直接切换显示状态
+                    } else {
+                        offcanvasInstance = new bootstrap.Offcanvas(offcanvasElement); // 如果 Offcanvas 还未初始化，则进行初始化并显示
+                        offcanvasInstance.show();
+                    }
+                }
+            });
+        });
+
+        function loadSingleCard(minion_id, ImgSrc, container) {
+            var imgId = 'card-' + minion_id;
+            var col = $('<img draggable="true" class="col-lg-2" ondragstart="drag(event)" style="border-radius:unset; padding-bottom: 10px;flex: 0 0 auto; width: 16.66%;">').attr('id', imgId).add('card_id', minion_id).attr('src', ImgSrc).addClass('card-img');
+            container.append(col);
+        }
+
+        function loadCards(filters) {
+            $.ajax({
+                url: '/cards/list',
+                type: 'GET',
+                data: filters, // 将过滤条件传递给服务器
+                dataType: 'json',
+                success: function (response) {
+                    if (response.code === 200) {
+                        var cards = response.data;
+                        var container = $('#cards-main');
+                        container.empty();
+
+                        $.each(cards, function (index, card) {
+                            loadSingleCard(card.minion_id, '/' + card.image, container)
+                        });
+                    } else {
+                        console.error('Request failed with message: ' + response.message);
+                    }
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    console.error('Ajax request failed: ' + textStatus + ', ' + errorThrown);
+                }
+            });
+        }
+
+
+    </script>
+
+{% endblock scripts %}

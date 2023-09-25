@@ -1,10 +1,9 @@
 from django.contrib import admin
-from home.models import MinionModel
-from django.utils.html import format_html
 from django.db.models import Count
 
+from django.utils.html import format_html
 
-# Register your models here.
+from home.models import MinionModel
 
 
 class DuplicatesFilter(admin.SimpleListFilter):

@@ -1,11 +1,17 @@
 import hashlib
 import os, json, traceback
 
-from admin_soft.utils import JsonResponse
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import connection
 from django.conf import settings
+from django.db.models import Q
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+from admin_soft.utils import JsonResponse
+
 from home.utils.full_moon import *
 from .tasks import *
 
@@ -192,3 +198,104 @@ def imgmanagement_cutcard(request):
             return JsonResponse({'error': 'File not found.'}, status=404)
     else:
         return JsonResponse({'error': 'No image file name provided.'}, status=400)
+
+
+def cards_index(request):
+    """
+    卡片列表
+    """
+    context = {}
+
+    context['stars'] = (1, 2, 3, 4, 5, 6)
+    context['factions'] = FACTION_CHOICES
+
+    # get features
+    context['features'] = FeatureModel.objects.all()
+
+    return render(request, 'cards/index.html', context)
+
+
+def cards_list(request):
+    response = {
+        'code': 200,
+        'message': 'OK',
+        'data': []
+    }
+
+    try:
+        minions = MinionModel.objects.filter(is_valid=1)
+
+        stars = request.GET.getlist('stars[]')
+        if stars:
+            minions = minions.filter(stars__in=stars)
+
+        factions = request.GET.getlist('faction[]')
+        if factions:
+            minions = minions.filter(faction__in=factions)
+
+        query = request.GET.get('query')
+        if query:
+            minions = minions.filter(Q(name__icontains=query) | Q(desc__icontains=query))
+
+        feature = request.GET.get('feature')
+        if feature:
+            minions = minions.filter(features__feature=feature)
+
+        order_by = request.GET.get('order_by')
+        if order_by:
+            minions = minions.order_by(order_by)
+        else:
+            minions = minions.order_by('name')
+
+        response['data'] = [{
+            'minion_id': minion.minion_id,
+            'name': minion.name,
+            'stars': minion.stars,
+            'attack': minion.attack,
+            'health': minion.health,
+            'faction': minion.faction,
+            'desc': minion.desc,
+            'image': minion.image,
+            'features': [feature.feature for feature in minion.features.all()],
+        } for minion in minions]
+
+    except Exception as e:
+        response['code'] = 500
+        response['message'] = str(e)
+
+    response['count'] = len(response['data'])
+    return JsonResponse(response)
+
+
+def formation_save(request):
+    response = {'code': 200, 'message': 'ok'}
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        name = data.get('name')
+        if not name:
+            name = 'Another Formation'
+
+        response['post'] = data;
+        formation = FormationModel.objects.create(name=name)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    for position_number, minion_ids in data.items():
+        if position_number == 'name':
+            continue
+
+        try:
+            position_number = int(position_number.replace('position', ''))
+        except ValueError:
+            return JsonResponse({'error': 'Invalid position number'}, status=400)
+
+        try:
+            minions = MinionModel.objects.filter(minion_id__in=minion_ids)
+        except ObjectDoesNotExist:
+            return JsonResponse({'error': 'Minion not found'}, status=404)
+
+        position = PositionModel.objects.create(formation=formation, position_number=position_number)
+        position.minions.set(minions)
+
+    return JsonResponse(response)
