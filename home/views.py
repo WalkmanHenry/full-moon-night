@@ -243,9 +243,16 @@ def cards_list(request):
 
         order_by = request.GET.get('order_by')
         if order_by:
-            minions = minions.order_by(order_by)
+            if order_by == 'stars':
+                minions = minions.order_by('stars', 'faction')
+            elif order_by == 'stars-desc':
+                minions = minions.order_by('-stars', 'faction')
+            elif order_by == 'faction':
+                minions = minions.order_by('faction', 'stars')
+            elif order_by == 'faction-desc':
+                minions = minions.order_by('faction', '-stars')
         else:
-            minions = minions.order_by('name')
+            minions = minions.order_by('stars', 'faction')
 
         response['data'] = [{
             'minion_id': minion.minion_id,
@@ -268,7 +275,7 @@ def cards_list(request):
 
 
 def formation_save(request):
-    response = {'code': 200, 'message': 'ok'}
+    response = {'code': 400, 'message': 'Bad Request'}
 
     try:
         data = json.loads(request.body.decode('utf-8'))
@@ -276,26 +283,194 @@ def formation_save(request):
         if not name:
             name = 'Another Formation'
 
-        response['post'] = data;
-        formation = FormationModel.objects.create(name=name)
+        # 先获取所有的Minion所涉及的种族
+        all_minion_ids = []
+
+        filtered_data = {position_number: minion_ids for position_number, minion_ids in data.items() if
+                         position_number != 'name'}
+        for position_number, minion_ids in filtered_data.items():
+            if position_number == 'name':
+                continue
+            for id in minion_ids:
+                all_minion_ids.append(id)
+
+        if len(all_minion_ids) == 0:
+            response['message'] = 'Bad Request: No minion in formation'
+            return JsonResponse(response)
+
+        minions = MinionModel.objects.filter(minion_id__in=all_minion_ids)
+        unique_factions = minions.values_list('faction', flat=True).distinct()
+
+        faction_int = 0
+        # 从所有的minion中取得不重复的fation数据
+        for x in list(unique_factions):
+            faction_int += 10 ** (x - 1)
+
+        formation = FormationModel.objects.create(name=name, factions=faction_int)
     except (json.JSONDecodeError, TypeError):
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        response['message'] = 'Bad Request: Invalid JSON'
+        return JsonResponse(response)
 
-    for position_number, minion_ids in data.items():
-        if position_number == 'name':
-            continue
-
+    for position_number, minion_ids in filtered_data.items():
         try:
             position_number = int(position_number.replace('position', ''))
         except ValueError:
-            return JsonResponse({'error': 'Invalid position number'}, status=400)
+            response['message'] = 'Bad Request: No minion in formation'
+            return JsonResponse(response)
 
         try:
             minions = MinionModel.objects.filter(minion_id__in=minion_ids)
         except ObjectDoesNotExist:
-            return JsonResponse({'error': 'Minion not found'}, status=404)
+            response['code'] = 404
+            response['message'] = 'Not found: No minion found.'
+            return JsonResponse(response)
 
         position = PositionModel.objects.create(formation=formation, position_number=position_number)
         position.minions.set(minions)
+
+    response['code'] = 200
+    response['message'] = 'Success'
+    return JsonResponse(response)
+
+
+def formation_index(request):
+    """
+    Formation
+    """
+    context = {
+    }
+
+    context['factions'] = FACTION_CHOICES
+
+    return render(request, 'formation/index.html', context)
+
+
+def formation_list(request):
+    # Initialize response dictionary
+    response = {
+        'code': 400,
+        'message': 'Bad Request.',
+        'data': []
+    }
+    try:
+        # Get factions from request parameters if available
+        factions = request.GET.getlist('factions[]')
+
+        # If factions are provided, filter the formations by those factions
+        if factions:
+            factions = list(map(int, factions))
+            formations = FormationModel.objects.filter(factions__in=factions)
+        else:  # Otherwise, retrieve all formations
+            formations = FormationModel.objects.all()
+
+        # sort by
+        if 'sort' in request.GET and request.GET.get('sort') == 'asc':
+            formations.order_by('id')
+        else:
+            formations.order_by('-id')
+
+        formations.order_by('-id')
+        for formation in formations:
+            positions = formation.positionmodel_set.all()
+
+            # Extracting positions with their associated minion ids
+            positions_data = {}
+            for position in positions:
+                positions_data[position.position_number] = list(position.minions.values_list('minion_id', flat=True))
+
+            response['code'] = 200
+            response['message'] = 'Success'
+            response['data'].append({
+                'formation_id': formation.id,
+                'name': formation.name,
+                'factions': formation.factions,
+                'positions': positions_data
+            })
+
+    except Exception as e:
+        response['code'] = 500
+        response['message'] = f'Error: {str(e)}'
+
+    return JsonResponse(response)
+
+
+def formation_list(request):
+    # Initialize response dictionary
+    response = {
+        'code': 400,
+        'message': 'Bad Request.',
+        'data': []
+    }
+    factions = request.GET.getlist('faction[]')
+    f = MinionModel.generate_combinations_and_offsets(factions)
+    try:
+        # Get all minions
+        minions = MinionModel.objects.all()
+        # set minions' id:image to response['minions']
+        response['minions'] = {}
+        for minion in minions:
+            response['minions'][minion.minion_id] = minion.image
+        # Get factions from request parameters if available
+        factions = request.GET.getlist('faction[]')
+        factions_in = MinionModel.generate_combinations_and_offsets(factions)
+
+        # If factions are provided, filter the formations by those factions
+        if factions:
+            formations = FormationModel.objects.filter(factions__in=factions_in)
+        else:  # Otherwise, retrieve all formations
+            formations = FormationModel.objects
+
+        query = request.GET.get('query')
+        if query:
+            formations = formations.filter(Q(name__icontains=query))
+
+        # sort by
+        if 'sort' in request.GET and request.GET.get('sort') == 'asc':
+            formations = formations.order_by('id')
+        else:
+            formations = formations.order_by('-id')
+
+        for formation in formations:
+            positions = formation.positionmodel_set.all()
+
+            # Extracting positions with their associated minion ids
+            positions_data = {}
+            for position in positions:
+                positions_data[position.position_number] = list(position.minions.values_list('minion_id', flat=True))
+
+            response['code'] = 200
+            response['message'] = 'Success'
+            response['data'].append({
+                'formation_id': formation.id,
+                'name': formation.name,
+                'factions': formation.factions,
+                'positions': positions_data
+            })
+
+    except Exception as e:
+        response['code'] = 500
+        response['message'] = f'Error: {str(e)}'
+
+    return JsonResponse(response)
+
+
+def formation_remove(request):
+    response = {
+        'code': 404,
+        'message': 'Not Found',
+        'data': {}
+    }
+    id = request.GET.get('id')
+    if id:
+        # 删除formation和关联的数据
+        try:
+            formation = FormationModel.objects.get(id=id)
+            response['code'] = 200
+            response['message'] = 'Success'
+            formation.delete()
+
+        except:
+            response['code'] = 500
+            response['message'] = 'Error in remove formation'
 
     return JsonResponse(response)

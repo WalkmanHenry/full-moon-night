@@ -1,4 +1,5 @@
 from django.db import models
+from itertools import chain, combinations
 
 INITIALED_CHOICES = [
     (-1, 'Uninitialized'),
@@ -82,6 +83,34 @@ class MinionModel(models.Model):
     # 1=checked, -1=unchecked
     is_checked = models.SmallIntegerField(choices=CHECKED_CHOICES, default=-1)
 
+    @classmethod
+    def generate_combinations_and_offsets(cls, factions):
+        """
+        根据给定的 factions 列表，生成所有可能的组合和对应的偏移值。
+            factions = [1, 2, 6]
+            offset_values = generate_combinations_and_offsets(factions)
+
+            # 输出所有可能的组合和对应的偏移值
+            for combo, offset in offset_values.items():
+                print(f"{combo}: {offset}")
+
+        :param factions: 一个整数列表，表示 faction。
+        :return: 一个字典，其中键是字符串格式的组合，值是该组合对应的偏移值。
+        """
+        # 获取所有可能的组合，不包括空集
+        faction_combinations = chain.from_iterable(combinations(factions, r) for r in range(1, len(factions) + 1))
+
+        # 计算每个组合的偏移值
+        offset_values = []
+        for combo in faction_combinations:
+            offset_value = MinionModel.generate_factions_code(combo)
+            offset_values.append(offset_value)
+        return offset_values
+
+    @classmethod
+    def generate_factions_code(cls, factions):
+        return sum(10 ** (int(faction) - 1) for faction in factions)
+
     def __str__(self):
         return self.name
 
@@ -116,13 +145,7 @@ class FeatureModel(models.Model):
 class FormationModel(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255, default='')
-    factions = models.TextField(blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        # 当保存阵型时，更新 factions 字段
-        factions_set = set(self.positionmodel_set.values_list('minions__faction', flat=True))
-        self.factions = ','.join(factions_set)
-        super().save(*args, **kwargs)
+    factions = models.IntegerField(default=0)
 
     class Meta:
         db_table = 'fmn_formation'
