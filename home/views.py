@@ -300,13 +300,16 @@ def formation_save(request):
 
         minions = MinionModel.objects.filter(minion_id__in=all_minion_ids)
         unique_factions = minions.values_list('faction', flat=True).distinct()
+        # 将所有的minions的name相连接作为search_name字段方便后期搜索
+        search_name = ','.join([minion.name for minion in minions])
 
         faction_int = 0
         # 从所有的minion中取得不重复的fation数据
         for x in list(unique_factions):
             faction_int += 10 ** (x - 1)
 
-        formation = FormationModel.objects.create(name=name, factions=faction_int)
+        formation = FormationModel.objects.create(name=name, factions=faction_int, search_minion=search_name)
+
     except (json.JSONDecodeError, TypeError):
         response['message'] = 'Bad Request: Invalid JSON'
         return JsonResponse(response)
@@ -422,7 +425,7 @@ def formation_list(request):
 
         query = request.GET.get('query')
         if query:
-            formations = formations.filter(Q(name__icontains=query))
+            formations = formations.filter(Q(name__icontains=query) | Q(search_minion__icontains=query))
 
         # sort by
         if 'sort' in request.GET and request.GET.get('sort') == 'asc':
