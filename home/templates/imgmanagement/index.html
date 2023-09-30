@@ -28,11 +28,11 @@
                                         <div class="card-body">
                                             <div class="card-img" >{{ image.alias }}
                                             {% if image.is_initialed == -1 %}
-                                                <span id="span-init-{{ image.image_id }}" style="color: red"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }})" href="#"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> Init</a></span>
+                                                <span id="span-init-{{ image.image_id }}" style="color: red"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }})" href="#span-init-{{ image.image_id }}"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> Init</a></span>
                                             {% elif image.is_initialed == 0 %}
-                                                <span id="span-init-{{ image.image_id }}" style="color: green"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }}, 1)" href="#"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> Force</a></span>
+                                                <span id="span-init-{{ image.image_id }}" style="color: green"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }}, 1)" href="#span-init-{{ image.image_id }}"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> Force</a></span>
                                             {% else %}
-                                                <span id="span-init-{{ image.image_id }}" style="color: green"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }})" href="#"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> ReInit</a></span>
+                                                <span id="span-init-{{ image.image_id }}" style="color: green"> {{ image.init }} <a id="btn-init-{{ image.image_id }}" style="float: right" onclick="initimg({{ image.image_id }})" href="#span-init-{{ image.image_id }}"><i class="fa fa-refresh fa-1 " aria-hidden="true" style="font-size: 0.2em"></i> ReInit</a></span>
                                             {% endif %}
                                                 <img class="card-img" src="{{ image.file_path }}"
                                                      alt="{{ image.alias }}" style="border-radius: unset;padding-bottom: 4px">

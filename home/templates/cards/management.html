@@ -36,7 +36,7 @@
                                     {% for faction in factions %}
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" value="{{ faction.0 }}"
-                                                   checked="checked" name="faction[]">
+                                                   name="faction[]">
                                             <label class="form-check-label" for="star1">{{ faction.1 }}</label>
                                         </div>
                                     {% endfor %}
@@ -80,9 +80,12 @@
                     </div>
 
                     <div class="card-body ">
-                        <div class="row" id="cards-main" ondrop="drop_to_main(event, this)"
-                             ondragover="allowDrop(event)">
-                        </div>
+                        <form method="post" action="{% url 'cards_multimodify' %}">
+                            {% csrf_token %}
+                            <div class="row" id="cards-main"
+                                 ondragover="allowDrop(event)">
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -91,7 +94,6 @@
 
     <div class="offcanvas offcanvas-start" style="width: 580px" data-bs-scroll="true" data-bs-backdrop="false"
          tabindex="-1" id="offcanvasScrolling" aria-labelledby="offcanvasScrollingLabel">
-        {% csrf_token %}
         <div class="offcanvas-header">
             <h5 class="offcanvas-title" id="offcanvasScrollingLabel">Put your minions here to make formation.</h5>
         </div>
@@ -187,27 +189,6 @@
             if (origParent && origImage) origParent.removeChild(origImage);
         }
 
-        function drop_to_main(ev) {
-            ev.preventDefault();
-            var data = ev.dataTransfer.getData("text");
-            var origParentId = ev.dataTransfer.getData("parentId");
-            var origParent = document.getElementById(origParentId);
-            var origImage = document.getElementById(data);
-            // 如果是从主容器拖到主容器则放弃操作
-            if (origParentId == "cards-main") {
-                console.log("drop to main");
-                return false;
-            }
-            var minion_id = data.split("_")[1];
-            var src = ev.dataTransfer.getData("src");
-            if (origParent && origImage) {
-                origParent.removeChild(origImage);
-                updateImageStyles(origParentId)
-            } else {
-                console.log('查看：', origImage);
-            }
-            loadSingleCard(minion_id, src, $('#cards-main'));
-        }
 
         function drop(ev, dropzone) {
             ev.preventDefault();
@@ -330,11 +311,37 @@
                     }
                 }
             });
+
+            // 使用 jQuery 来处理全选按钮的点击事件
+            $(document).on('click', '#selectAllBtn', function () {
+                $("#cards-main div img").click()
+            });
+
         });
 
-        function loadSingleCard(minion_id, ImgSrc, container) {
-            var imgId = 'card-' + minion_id;
-            var col = $('<img draggable="true" class="col-lg-2" ondragstart="drag(event)" style="border-radius:unset; padding-bottom: 10px;flex: 0 0 auto; width: 16.66%;">').attr('id', imgId).add('card_id', minion_id).attr('src', ImgSrc).addClass('card-img');
+        function loadSingleCard(card, container) {
+            var imgId = 'card-' + card.minion_id;
+            var col = $('<div class="col-lg-2" style="margin-bottom: 20px;"></div>')
+            var field_name = $('<input type="text" class="form-control" name="name_' + card.minion_id + '" value="' + card.name + '" />');
+            var field_desc = $('<textarea class="form-control" name="desc_' + card.minion_id + '" style="font-size: 10px">' + card.desc + '</textarea>');
+            var hiddenInput = $('<input type="hidden" name="state_' + card.minion_id + '" value="-1" />');
+            var field_image = $('<img ondragstart="drag(event)" style="border-radius:unset;flex: 0 0 auto; width: 100%;">').attr('id', card.minion_id).add('card_id', card.minion_id).attr('src', '/' + card.image).addClass('card-img');
+            field_image.click(function () {
+                var inputValue = parseInt(hiddenInput.val());
+                if (inputValue === -1) {
+                    hiddenInput.val('1');
+                    field_image.css('border', '4px solid #e3170d ');
+                    field_image.css('border-radius', '10px');
+                } else {
+                    hiddenInput.val('-1');
+                    field_image.css('border', 'none');
+                }
+            });
+
+            col.append(field_name);
+            col.append(field_image);
+            col.append(hiddenInput);
+            col.append(field_desc);
             container.append(col);
         }
 
@@ -351,8 +358,26 @@
                         container.empty();
 
                         $.each(cards, function (index, card) {
-                            loadSingleCard(card.minion_id, '/' + card.image, container)
+                            loadSingleCard(card, container)
                         });
+
+                        var col = `<div class="row">
+             <div class="col-4">
+                <select name="feature" class="form-control" id="featureSelect">
+                    <option >--Features--</option>
+                    {% for feature in features %}
+                        <option value="{{ feature.feature_id }}">{{ feature.feature }}</option>
+                    {% endfor %}
+                </select>
+             </div>
+             <div class="col-4">
+                <button type="button" class="btn btn-secondary" id="selectAllBtn">Select All</button>
+             </div>
+             <div class="col-4">
+                <input type="submit" class="btn btn-primary " value="Save">
+             </div>
+           </div>`;
+                        container.append(col);
                     } else {
                         console.error('Request failed with message: ' + response.message);
                     }

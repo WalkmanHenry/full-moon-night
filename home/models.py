@@ -76,7 +76,8 @@ class MinionModel(models.Model):
     desc = models.CharField(max_length=255, default='')
     image = models.CharField(max_length=255, default='')
     stars = models.SmallIntegerField(default=0)
-    features = models.ManyToManyField('FeatureModel', related_name='minions')
+    features = models.ManyToManyField('FeatureModel', related_name='minions', blank=True, null=True)
+
 
     # 1=valid, -1=invalid
     is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
@@ -143,7 +144,7 @@ class FeatureModel(models.Model):
 
 
 class FormationModel(models.Model):
-    id = models.AutoField(primary_key=True)
+    formation_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255, default='')
     factions = models.IntegerField(default=0)
     search_minion = models.TextField(default='')
@@ -153,7 +154,7 @@ class FormationModel(models.Model):
 
 
 class PositionModel(models.Model):
-    id = models.AutoField(primary_key=True)
+    position_id = models.AutoField(primary_key=True)
     formation = models.ForeignKey(FormationModel, on_delete=models.CASCADE)  # 外键，连接到FormationModel
     position_number = models.PositiveIntegerField()  # 位置编号（1-6）
     minions = models.ManyToManyField('MinionModel')  # 多对多关系，一个位置可以有多个随从
@@ -161,3 +162,19 @@ class PositionModel(models.Model):
     class Meta:
         db_table = 'fmn_position'
         unique_together = ['formation', 'position_number']  # (formation, position_number)的组合必须是唯一的
+
+
+class EquipmentModel(models.Model):
+    equipment_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255, default='')
+    desc = models.CharField(max_length=255, default='')
+    stars = models.SmallIntegerField(default=2)
+    features = models.ManyToManyField('FeatureModel', related_name='equipment')
+    image = models.CharField(max_length=255, default='')
+    # 1=valid, -1=invalid
+    is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
+    # 1=checked, -1=unchecked
+    is_checked = models.SmallIntegerField(choices=CHECKED_CHOICES, default=-1)
+
+    class Meta:
+        db_table = 'fmn_equipment'

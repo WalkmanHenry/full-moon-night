@@ -1,9 +1,23 @@
 from django.contrib import admin
 from django.db.models import Count
+from django import forms
+from django.shortcuts import render
 
 from django.utils.html import format_html
 
 from home.models import MinionModel
+from home.models import FormationModel
+from home.models import FeatureModel
+
+
+class FeatureForm(forms.Form):
+    feature = forms.ModelMultipleChoiceField(
+        queryset=FeatureModel.objects.all(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label='Feature'
+    )
+    _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
 
 
 class DuplicatesFilter(admin.SimpleListFilter):
@@ -33,14 +47,30 @@ class DuplicatesFilter(admin.SimpleListFilter):
 
 
 class MinionAdmin(admin.ModelAdmin):
-    list_display = ('display_image_list', 'display_features','stars', 'faction', 'is_checked')
+    list_display = ('display_image_list', 'display_features', 'stars', 'faction', 'is_checked')
     readonly_fields = ['display_image']  # 图像显示字段设为只读
-    list_filter = ['is_checked', 'is_valid', DuplicatesFilter , 'faction']
+    list_filter = ['is_checked', 'is_valid', DuplicatesFilter, 'faction']
     search_fields = ['name', 'desc']
     list_per_page = 20
 
+    def set_feature(self, request, queryset):
+        if 'apply' in request.POST:
+            form = FeatureForm(request.POST)
+            if form.is_valid():
+                selected_features = form.cleaned_data['feature']
+                for minion in queryset:
+                    minion.features.set(selected_features)  # 使用 set 方法更新多对多关系
+                self.message_user(request, f'{queryset.count()}个Minion的feature已设置。')
+        else:
+            form = FeatureForm(initial={'_selected_action': queryset.values_list('pk', flat=True)})
+
+        return render(request, 'admin/set_feature.html', {'minions': queryset, 'feature_form': form})
+
     def make_checked(modeladmin, request, queryset):
         queryset.update(is_checked=1)
+
+    def make_faction1(modeladmin, request, queryset):
+        queryset.update(faction=1)
 
     def lookups(self, request, model_admin):
         return (
@@ -52,7 +82,7 @@ class MinionAdmin(admin.ModelAdmin):
         """重写以默认只包含is_valid为1的对象"""
         qs = super().get_queryset(request)
         is_valid = request.GET.get('is_valid__exact', 1)
-        data = qs.filter(is_valid=is_valid)
+        data = qs.filter(is_valid=is_valid).order_by('name')
 
         return data
 
@@ -82,7 +112,10 @@ class MinionAdmin(admin.ModelAdmin):
 
     display_image.short_description = 'Image'
     display_features.short_description = 'Info'
-    actions = [make_checked]
+    actions = ['set_feature', 'make_checked', 'make_faction1']
+
+    set_feature.short_description = "设置所选随从的技能"
+    make_faction1.short_description = "设置为中立阵容"
 
 
 admin.site.register(MinionModel, MinionAdmin)

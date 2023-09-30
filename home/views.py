@@ -49,7 +49,8 @@ def imgmanagement_index(request):
         image_data, created = ImageModel.objects.get_or_create(file_path=file_path)
 
     # sign -1 to is_invalid in db
-    images_in_db = ImageModel.objects.filter(is_valid=1)
+    # sort by is_initialed
+    images_in_db = ImageModel.objects.filter(is_valid=1).order_by('is_initialed')
     existing_files = [os.path.join(attachment_path, image.file_path) for image in images_in_db]
 
     for image in images_in_db:
@@ -355,55 +356,6 @@ def formation_list(request):
         'message': 'Bad Request.',
         'data': []
     }
-    try:
-        # Get factions from request parameters if available
-        factions = request.GET.getlist('factions[]')
-
-        # If factions are provided, filter the formations by those factions
-        if factions:
-            factions = list(map(int, factions))
-            formations = FormationModel.objects.filter(factions__in=factions)
-        else:  # Otherwise, retrieve all formations
-            formations = FormationModel.objects.all()
-
-        # sort by
-        if 'sort' in request.GET and request.GET.get('sort') == 'asc':
-            formations.order_by('id')
-        else:
-            formations.order_by('-id')
-
-        formations.order_by('-id')
-        for formation in formations:
-            positions = formation.positionmodel_set.all()
-
-            # Extracting positions with their associated minion ids
-            positions_data = {}
-            for position in positions:
-                positions_data[position.position_number] = list(position.minions.values_list('minion_id', flat=True))
-
-            response['code'] = 200
-            response['message'] = 'Success'
-            response['data'].append({
-                'formation_id': formation.id,
-                'name': formation.name,
-                'factions': formation.factions,
-                'positions': positions_data
-            })
-
-    except Exception as e:
-        response['code'] = 500
-        response['message'] = f'Error: {str(e)}'
-
-    return JsonResponse(response)
-
-
-def formation_list(request):
-    # Initialize response dictionary
-    response = {
-        'code': 400,
-        'message': 'Bad Request.',
-        'data': []
-    }
     factions = request.GET.getlist('faction[]')
     f = MinionModel.generate_combinations_and_offsets(factions)
     try:
@@ -429,9 +381,9 @@ def formation_list(request):
 
         # sort by
         if 'sort' in request.GET and request.GET.get('sort') == 'asc':
-            formations = formations.order_by('id')
+            formations = formations.order_by('formation_id')
         else:
-            formations = formations.order_by('-id')
+            formations = formations.order_by('-formation_id')
 
         for formation in formations:
             positions = formation.positionmodel_set.all()
@@ -441,14 +393,15 @@ def formation_list(request):
             for position in positions:
                 positions_data[position.position_number] = list(position.minions.values_list('minion_id', flat=True))
 
-            response['code'] = 200
-            response['message'] = 'Success'
             response['data'].append({
-                'formation_id': formation.id,
+                'formation_id': formation.formation_id,
                 'name': formation.name,
                 'factions': formation.factions,
                 'positions': positions_data
             })
+
+        response['code'] = 200
+        response['message'] = 'Success'
 
     except Exception as e:
         response['code'] = 500
@@ -467,7 +420,7 @@ def formation_remove(request):
     if id:
         # 删除formation和关联的数据
         try:
-            formation = FormationModel.objects.get(id=id)
+            formation = FormationModel.objects.get(formation_id=id)
             response['code'] = 200
             response['message'] = 'Success'
             formation.delete()
@@ -477,3 +430,135 @@ def formation_remove(request):
             response['message'] = 'Error in remove formation'
 
     return JsonResponse(response)
+
+
+def cards_management(request):
+    """
+    卡片管理
+    """
+    context = {}
+
+    context['stars'] = (1, 2, 3, 4, 5, 6)
+    context['factions'] = FACTION_CHOICES
+
+    # get features
+    context['features'] = FeatureModel.objects.all()
+
+    return render(request, 'cards/management.html', context)
+
+
+def cards_multimodify(request):
+    # get state[n]
+    cards = {}
+    cards_ids = []
+    for key, rowset in request.POST.items():
+        key_row = key.split('_')
+        if len(key_row) > 1:
+            key_int = int(key_row[1])
+            cards_ids.append(key_int);
+            if not key_int in cards:
+                cards[key_int] = {}
+            if key_row[0] == 'name':
+                cards[key_int]['name'] = rowset
+            elif key_row[0] == 'state':
+                cards[key_int]['state'] = rowset
+            elif key_row[0] == 'desc':
+                cards[key_int]['desc'] = rowset
+
+    feature_id = request.POST.get('feature', None)
+    if feature_id is None:
+        feature = None
+    else:
+        feature = FeatureModel.objects.get(feature_id=feature_id)
+
+    if len(cards_ids) > 0:
+        minions = MinionModel.objects.filter(minion_id__in=cards_ids)
+        # check modified
+        for minion in minions:
+            to_update = False
+            if minion.desc != cards[minion.minion_id]['desc']:
+                to_update = True
+                minion.desc = cards[minion.minion_id]['desc']
+
+            if minion.name != cards[minion.minion_id]['name']:
+                to_update = True
+                minion.name = cards[minion.minion_id]['name']
+
+            if to_update:
+                print(f"({minion.minion_id}) {minion.name} updated.")
+                minion.save()
+
+            if int(cards[minion.minion_id]['state']) == 1 and feature:
+                print(f"({minion.minion_id}) state: {cards[minion.minion_id]['state']}. update featue:{feature} {feature.feature_id}")
+                minion.features.add(feature)
+
+    message = {
+        'title': 'Success',
+        'message': 'Successfully updated cards.',
+        'url': '/cards/management',
+        'timeout': 5,
+    }
+    return render(request, 'message.html', message)
+
+def equipment_list(request):
+    response = {
+        'code': 200,
+        'message': 'OK',
+        'data': []
+    }
+
+    try:
+        equipments = EquipmentModel.objects.filter(is_valid=1)
+
+        stars = request.GET.getlist('stars[]')
+        if stars:
+            equipments = equipments.filter(stars__in=stars)
+
+        query = request.GET.get('query')
+        if query:
+            equipments = equipments.filter(Q(name__icontains=query) | Q(desc__icontains=query))
+
+        feature = request.GET.get('feature')
+        if feature:
+            minions = equipments.filter(features__feature=feature)
+
+        order_by = request.GET.get('order_by')
+        if order_by:
+            if order_by == 'stars':
+                equipments = equipments.order_by('stars')
+            elif order_by == 'stars-desc':
+                equipments = equipments.order_by('-stars')
+        else:
+            equipments = equipments.order_by('stars')
+
+        response['data'] = [{
+            'equipment_id': equipment.equipment_id,
+            'name': equipment.name,
+            'stars': equipment.stars,
+            'desc': equipment.desc,
+            'image': equipment.image,
+            'features': [feature.feature for feature in equipment.features.all()],
+        } for equipment in equipments]
+
+    except Exception as e:
+        response['code'] = 500
+        response['message'] = str(e)
+
+    response['count'] = len(response['data'])
+    return JsonResponse(response)
+
+def equipment_management(request):
+    context = {}
+
+    context['stars'] = (1, 2, 3, 4, 5, 6)
+    context['factions'] = FACTION_CHOICES
+
+    # get features
+    context['features'] = FeatureModel.objects.all()
+
+    return render(request, 'equipment/management.html', context)
+def equipment_multimodify(request):
+    message = {
+
+    }
+    return render(request, 'message.html', message)

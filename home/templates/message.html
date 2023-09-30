@@ -1,0 +1,29 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-header pb-0">
+                    <div class="row">
+                        <h1>{{ title }}</h1>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {{ message }}
+                    {% if url %}
+                        <br><br><a href="{{ url }}">Click here to redirect</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% if timeout > 0 and url %}
+        <meta http-equiv="refresh" content="{{ timeout }};url={{ url }}"/>
+    {% else %}
+        <meta http-equiv="refresh" content="url={{ url }}"/>
+    {% endif %}
+
+{% endblock content %}
