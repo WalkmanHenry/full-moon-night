@@ -364,7 +364,7 @@
                         var col = `<div class="row">
              <div class="col-4">
                 <select name="feature" class="form-control" id="featureSelect">
-                    <option >--Features--</option>
+                    <option value="">--Features--</option>
                     {% for feature in features %}
                         <option value="{{ feature.feature_id }}">{{ feature.feature }}</option>
                     {% endfor %}

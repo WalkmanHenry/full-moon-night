@@ -68,7 +68,7 @@
                     </div>
 
                     <div class="card-body ">
-                        <form method="post" action="{% url 'cards_multimodify' %}">
+                        <form method="post" action="{% url 'equipment_multimodify' %}">
                             {% csrf_token %}
                             <div class="row" id="cards-main"
                                  ondragover="allowDrop(event)">
@@ -308,12 +308,12 @@
         });
 
         function loadSingleCard(card, container) {
-            var imgId = 'card-' + card.minion_id;
+            var imgId = 'card-' + card.equipment_id;
             var col = $('<div class="col-lg-2" style="margin-bottom: 20px;"></div>')
-            var field_name = $('<input type="text" class="form-control" name="name_' + card.minion_id + '" value="' + card.name + '" />');
-            var field_desc = $('<textarea class="form-control" name="desc_' + card.minion_id + '" style="font-size: 10px">' + card.desc + '</textarea>');
-            var hiddenInput = $('<input type="hidden" name="state_' + card.minion_id + '" value="-1" />');
-            var field_image = $('<img ondragstart="drag(event)" style="border-radius:unset;flex: 0 0 auto; width: 100%;">').attr('id', card.minion_id).add('card_id', card.minion_id).attr('src', '/' + card.image).addClass('card-img');
+            var field_name = $('<input type="text" class="form-control" name="name_' + card.equipment_id + '" value="' + card.name + '" />');
+            var field_desc = $('<textarea class="form-control" name="desc_' + card.equipment_id + '" style="font-size: 10px">' + card.desc + '</textarea>');
+            var hiddenInput = $('<input type="hidden" name="state_' + card.equipment_id + '" value="-1" />');
+            var field_image = $('<img ondragstart="drag(event)" style="border-radius:unset;flex: 0 0 auto; width: 100%;">').attr('id', card.equipment_id).add('card_id', card.equipment_id).attr('src', '/' + card.image).addClass('card-img');
             field_image.click(function () {
                 var inputValue = parseInt(hiddenInput.val());
                 if (inputValue === -1) {
@@ -352,7 +352,7 @@
                         var col = `<div class="row">
              <div class="col-4">
                 <select name="feature" class="form-control" id="featureSelect">
-                    <option >--Features--</option>
+                <option value="">--Features--</option>
                     {% for feature in features %}
                         <option value="{{ feature.feature_id }}">{{ feature.feature }}</option>
                     {% endfor %}
