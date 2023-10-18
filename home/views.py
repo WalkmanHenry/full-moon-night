@@ -1,6 +1,8 @@
+# Import necessary modules from the standard library.
 import hashlib
 import os, json, traceback
 
+# Import Django-specific utilities and functions.
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import connection
 from django.conf import settings
@@ -10,17 +12,33 @@ from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
+# Import utility functions from the specified modules.
 from admin_soft.utils import JsonResponse
 
+# Import functions from the 'home.utils.full_moon' module.
 from home.utils.full_moon import *
+
+# Import tasks related to the current module.
 from .tasks import *
 
+# Import database models from the 'home' app.
 from home.models import *
 
+# Define a list of valid image extensions.
 VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png']
 
 
+# Define the main index view function.
 def index(request):
+    """
+    Render the main index page.
+
+    Parameters:
+    - request: HTTP request object.
+
+    Returns:
+    - Rendered HTML page.
+    """
     return render(request, 'pages/index.html')
 
 
@@ -32,31 +50,36 @@ def hello(request):
 
 
 # Images Manager start
-def imgmanagement_index(request):
-    attachment_path = settings.ATTACHMENT_ROOT
 
-    # get all files in static/attachments/
+def imgmanagement_index(request):
+    """
+    Render the image management index page.
+
+    This function lists all files in the 'static/attachments/' directory,
+    checks if they are images and if they exist in the database.
+
+    Parameters:
+    - request: HTTP request object.
+
+    Returns:
+    - Rendered HTML page for image management.
+    """
+    attachment_path = settings.ATTACHMENT_ROOT
     file_list = os.listdir(attachment_path)
 
     for file_name in file_list:
         file_path = os.path.join(attachment_path, file_name)
-        # check if the file is an image
         ext = os.path.splitext(file_name)[1]
         if ext.lower() not in VALID_IMAGE_EXTENSIONS:
             continue
 
-        # check if the image is already in database
         image_data, created = ImageModel.objects.get_or_create(file_path=file_path)
 
-    # sign -1 to is_invalid in db
-    # sort by is_initialed
     images_in_db = ImageModel.objects.filter(is_valid=1).order_by('is_initialed')
     existing_files = [os.path.join(attachment_path, image.file_path) for image in images_in_db]
 
     for image in images_in_db:
         image.init = image.get_is_initialed_display()
-
-        # check file exists in static/attachments/ directory
         if not os.path.exists(image.file_path):
             image.is_valid = -1
             image.save()
@@ -71,7 +94,16 @@ def imgmanagement_index(request):
 
 def imgmanagement_cornernumbers(request):
     """
-    Show Conernumber page
+    Render the Corner Numbers page for images.
+
+    Lists and processes all files in specific subdirectories and sorts the images
+    by their filenames.
+
+    Parameters:
+    - request: HTTP request object.
+
+    Returns:
+    - Rendered HTML page for Corner Numbers of images.
     """
     context = {}
     attack_images = {}
@@ -82,7 +114,6 @@ def imgmanagement_cornernumbers(request):
 
     file_list = os.listdir(attack_file_path)
     for file_name in file_list:
-        # check if the file is an image
         file_name_split = file_name.split('.')
         ext = '.' + file_name_split[-1]
         if ext.lower() not in VALID_IMAGE_EXTENSIONS:
@@ -90,20 +121,12 @@ def imgmanagement_cornernumbers(request):
         value = file_name_split[0]
         attack_images[value] = attack_file_path + file_name
 
-    # 先将keys转为int
     attack_keys = list(map(int, attack_images.keys()))
-    # 使用sorted函数对字典的键进行排序
     sorted_keys = sorted(attack_keys)
-    # 创建一个新的有序字典，以保存排序后的结果
-    sorted_attack_images = {}
-
-    # 遍历排序后的键，将对应的键值对添加到新的有序字典中
-    for key in sorted_keys:
-        sorted_attack_images[key] = attack_images[str(key)]
+    sorted_attack_images = {str(key): attack_images[str(key)] for key in sorted_keys}
 
     file_list = os.listdir(health_file_path)
     for file_name in file_list:
-        # check if the file is an image
         file_name_split = file_name.split('.')
         ext = '.' + file_name_split[-1]
         if ext.lower() not in VALID_IMAGE_EXTENSIONS:
@@ -111,36 +134,47 @@ def imgmanagement_cornernumbers(request):
         value = file_name_split[0]
         health_images[value] = health_file_path + file_name
 
-    # 先将keys转为int
     health_keys = list(map(int, health_images.keys()))
-    # 使用sorted函数对字典的键进行排序
     sorted_keys = sorted(health_keys)
-    # 创建一个新的有序字典，以保存排序后的结果
-    sorted_health_images = {}
-    for key in sorted_keys:
-        sorted_health_images[key] = health_images[str(key)]
+    sorted_health_images = {str(key): health_images[str(key)] for key in sorted_keys}
 
     context['attack_images'] = sorted_attack_images
     context['health_images'] = sorted_health_images
     context['attachment_path'] = file_path
+
     return render(request, 'imgmanagement/cornernumbers.html', context)
 
 
 def imgmanagement_imageinit(request):
     """
-        Initialize the image
+    View to handle the initialization of a specific image.
 
+    This view retrieves an image by its ID and optionally re-initializes it
+    based on the 'force' parameter from the request. If the force reinitialization
+    is requested, the view updates the 'is_initialed' status of the image in the
+    database. The image initialization is handled asynchronously by adding the task
+    to a queue.
+
+    Parameters:
+    - request: Django HTTP request object. It is expected to contain:
+               - image ID as 'id'
+               - an optional 'force' parameter to force reinitialization
+
+    Returns:
+    - HttpResponse: A JSON response indicating the result of the operation. The
+                    response will either confirm the initialization action or
+                    provide an error message.
     """
-    # get id
+
+    # Extract the image ID and 'force' parameter from the request.
     id = int(request.GET.get('id'))
-    # request.GET.get('force') or -1
     force = request.GET.get('force')
     if force and force.isdigit():
         force = int(force)
     else:
         force = -1
 
-    # get the image file
+    # Prepare the initial context and response objects.
     context = {
         'force': force,
     }
@@ -149,51 +183,68 @@ def imgmanagement_imageinit(request):
         'message': 'not found',
     }
 
-    # 获取图片
     try:
+        # Retrieve the image by its ID from the database.
         image = ImageModel.objects.get(image_id=id)
+
+        # If force reinitialization is requested, update the 'is_initialed' field.
         if force == 1:
-            # force to reinitialize
             image.is_initialed = -1
             image.save()
 
-        # print(image)
-        # initial_image_task.delay(id)
+        # Queue the image initialization task for asynchronous processing.
         initial_image_task.delay(id)
-        print('tasks')
 
+        # Update the context with the details of the retrieved image.
         context['image_id'] = image.image_id
         context['file_path'] = image.file_path
         context['is_valid'] = image.is_valid
         context['is_initialed'] = image.is_initialed
 
+        # Update the response to indicate successful processing.
         response['code'] = 200
         response['message'] = 'success'
         response['data'] = context
+
         return HttpResponse(json.dumps(response), content_type="application/json")
-    except:
-        print('error:')
+    except Exception as e:
+        # Log the error and traceback details.
+        print('error:', e)
         traceback.print_exc()
+
+        # Return an error response in JSON format.
         return HttpResponse(json.dumps(response), content_type="application/json")
 
 
 def imgmanagement_cutcard(request):
     """
-    裁剪卡片
+    View to handle card image cutting.
+
+    This view retrieves the name of an image file from the request, either from
+    POST data or GET parameters. If the image file exists, a Celery task is
+    triggered to process the image cutting asynchronously.
+
+    Parameters:
+    - request: Django HTTP request object. It is expected to contain:
+               - image file name as 'image_file_name', either in POST data or GET parameters.
+
+    Returns:
+    - JsonResponse: A JSON response indicating the result of the operation. The
+                    response will either confirm the cutting action, inform
+                    about a missing file, or indicate a missing file name parameter.
     """
+
+    # Determine the request method to extract the image file name accordingly
     if request.method == 'POST':
-        # Get the image file name from the POST data
         image_file_name = request.POST.get('image_file_name')
     else:
         image_file_name = request.GET.get('image_file_name')
 
+    # If an image file name is provided, proceed with processing
     if image_file_name:
-        # Construct the full path of the image file
         file_path = os.path.join(settings.ATTACHMENT_ROOT, image_file_name)
         if os.path.exists(file_path):
-            # Trigger the Celery task to process the image
             cut_card_task.delay(file_path)
-
             return JsonResponse({'message': 'Processing initiated.'}, status=200)
         else:
             return JsonResponse({'error': 'File not found.'}, status=404)
@@ -203,20 +254,49 @@ def imgmanagement_cutcard(request):
 
 def cards_index(request):
     """
-    卡片列表
+    View to display a list of cards.
+
+    This view populates the context with information about card stars, factions,
+    and features, and renders a template to display a list of cards.
+
+    Parameters:
+    - request: Django HTTP request object.
+
+    Returns:
+    - HttpResponse: Rendered template displaying the list of cards.
     """
+
     context = {}
 
+    # Pre-populate context with fixed data for stars and factions
     context['stars'] = (1, 2, 3, 4, 5, 6)
     context['factions'] = FACTION_CHOICES
 
-    # get features
+    # Retrieve card features from the database and add to the context
     context['features'] = FeatureModel.objects.all()
 
     return render(request, 'cards/index.html', context)
 
 
 def cards_list(request):
+    """
+    View to retrieve and filter a list of cards (minions) based on specific criteria.
+
+    The available filter criteria include stars, faction, query (for name and description),
+    feature, and ordering preferences. The response provides a detailed list of minions
+    based on the applied filters.
+
+    Parameters:
+    - request: Django HTTP request object. Expected GET parameters:
+               - stars[]: List of preferred star ratings.
+               - faction[]: List of preferred factions.
+               - query: String to match against minion names and descriptions.
+               - feature: Specific feature to filter by.
+               - order_by: Ordering preference (e.g., 'stars', 'stars-desc', etc.).
+
+    Returns:
+    - JsonResponse: A JSON response containing the filtered list of minions and metadata.
+    """
     response = {
         'code': 200,
         'message': 'OK',
@@ -276,62 +356,88 @@ def cards_list(request):
 
 
 def formation_save(request):
+    """
+    View to save a formation of cards (minions) with specific positions.
+
+    The formation is defined by the provided list of minions and their designated positions.
+    Additional metadata about the formation, such as the involved factions and a search-friendly
+    name (concatenation of minion names), are also generated and stored.
+
+    Parameters:
+    - request: Django HTTP request object. Expected JSON body content:
+               - name: Name of the formation (optional).
+               - positionX: List of minion IDs assigned to the Xth position.
+               (X can be any integer value representing a position number.)
+
+    Returns:
+    - JsonResponse: A JSON response indicating the result of the formation-saving process.
+                    The response will either confirm successful saving or provide error details.
+    """
     response = {'code': 400, 'message': 'Bad Request'}
 
     try:
+        # Parse JSON data from the request body
         data = json.loads(request.body.decode('utf-8'))
-        name = data.get('name')
-        if not name:
-            name = 'Another Formation'
 
-        # 先获取所有的Minion所涉及的种族
+        # Get formation name from data; default to 'Another Formation' if not provided
+        name = data.get('name', 'Another Formation')
+
+        # Collect all minion IDs from the provided formation data
         all_minion_ids = []
 
+        # Filter out the 'name' key and only consider position-related keys
         filtered_data = {position_number: minion_ids for position_number, minion_ids in data.items() if
                          position_number != 'name'}
         for position_number, minion_ids in filtered_data.items():
-            if position_number == 'name':
-                continue
-            for id in minion_ids:
-                all_minion_ids.append(id)
+            all_minion_ids.extend(minion_ids)
 
-        if len(all_minion_ids) == 0:
+        # If no minions are provided, return an error response
+        if not all_minion_ids:
             response['message'] = 'Bad Request: No minion in formation'
             return JsonResponse(response)
 
+        # Fetch all minions corresponding to the provided IDs
         minions = MinionModel.objects.filter(minion_id__in=all_minion_ids)
+
+        # Get a list of unique factions among the fetched minions
         unique_factions = minions.values_list('faction', flat=True).distinct()
-        # 将所有的minions的name相连接作为search_name字段方便后期搜索
+
+        # Concatenate all minion names for easy searching in the future
         search_name = ','.join([minion.name for minion in minions])
 
-        faction_int = 0
-        # 从所有的minion中取得不重复的fation数据
-        for x in list(unique_factions):
-            faction_int += 10 ** (x - 1)
+        # Compute a unique integer representing the involved factions
+        faction_int = sum([10 ** (x - 1) for x in unique_factions])
 
+        # Create a new formation record with the given name, factions, and search name
         formation = FormationModel.objects.create(name=name, factions=faction_int, search_minion=search_name)
 
     except (json.JSONDecodeError, TypeError):
+        # If there's an error in parsing the JSON data, return an error response
         response['message'] = 'Bad Request: Invalid JSON'
         return JsonResponse(response)
 
+    # Loop over each position in the filtered data to create position records
     for position_number, minion_ids in filtered_data.items():
         try:
+            # Convert position string (e.g., 'position1') to an integer
             position_number = int(position_number.replace('position', ''))
         except ValueError:
             response['message'] = 'Bad Request: No minion in formation'
             return JsonResponse(response)
 
         try:
+            # Fetch minions for the current position
             minions = MinionModel.objects.filter(minion_id__in=minion_ids)
         except ObjectDoesNotExist:
             response['code'] = 404
             response['message'] = 'Not found: No minion found.'
             return JsonResponse(response)
 
+        # Create a position record for the current formation and set the minions to it
         position = PositionModel.objects.create(formation=formation, position_number=position_number)
         position.minions.set(minions)
 
+    # If everything went well, set the response to indicate success
     response['code'] = 200
     response['message'] = 'Success'
     return JsonResponse(response)
@@ -339,60 +445,82 @@ def formation_save(request):
 
 def formation_index(request):
     """
-    Formation
-    """
-    context = {
-    }
+    View to display the formation index page, with a list of available factions.
 
+    Parameters:
+    - request: Django HTTP request object.
+
+    Returns:
+    - HttpResponse: Rendered HTML template for the formation index.
+    """
+    context = {}
+
+    # Assign the global FACTION_CHOICES to the context to be used in the template.
     context['factions'] = FACTION_CHOICES
 
     return render(request, 'formation/index.html', context)
 
 
 def formation_list(request):
-    # Initialize response dictionary
+    """
+    View to retrieve a list of formations based on the given query parameters.
+
+    Parameters:
+    - request: Django HTTP request object. Accepts optional GET parameters:
+               - faction[]: List of faction identifiers to filter formations.
+               - query: Text search query to match against formation names or involved minions.
+               - sort: Sorting order ("asc" for ascending based on formation_id).
+
+    Returns:
+    - JsonResponse: A JSON response with a list of formations and any associated details.
+                    The response will either confirm successful retrieval or provide error details.
+    """
+    # Initialize the response dictionary.
     response = {
         'code': 400,
         'message': 'Bad Request.',
         'data': []
     }
-    factions = request.GET.getlist('faction[]')
-    f = MinionModel.generate_combinations_and_offsets(factions)
+
     try:
-        # Get all minions
+        # Retrieve all minions from the database.
         minions = MinionModel.objects.all()
-        # set minions' id:image to response['minions']
-        response['minions'] = {}
-        for minion in minions:
-            response['minions'][minion.minion_id] = minion.image
-        # Get factions from request parameters if available
+
+        # Create a dictionary mapping minion IDs to their associated image.
+        response['minions'] = {minion.minion_id: minion.image for minion in minions}
+
+        # Retrieve factions from request parameters.
         factions = request.GET.getlist('faction[]')
         factions_in = MinionModel.generate_combinations_and_offsets(factions)
 
-        # If factions are provided, filter the formations by those factions
+        # If factions are provided, filter formations by those factions.
         if factions:
             formations = FormationModel.objects.filter(factions__in=factions_in)
-        else:  # Otherwise, retrieve all formations
-            formations = FormationModel.objects
+        else:  # If no factions are provided, retrieve all formations.
+            formations = FormationModel.objects.all()
 
+        # If a query is provided, filter formations by name or associated minion names.
         query = request.GET.get('query')
         if query:
             formations = formations.filter(Q(name__icontains=query) | Q(search_minion__icontains=query))
 
-        # sort by
-        if 'sort' in request.GET and request.GET.get('sort') == 'asc':
+        # Determine sorting order based on the 'sort' parameter.
+        if request.GET.get('sort') == 'asc':
             formations = formations.order_by('formation_id')
         else:
             formations = formations.order_by('-formation_id')
 
+        # Loop over each formation to retrieve its details.
         for formation in formations:
+            # Fetch all positions associated with the current formation.
             positions = formation.positionmodel_set.all()
 
-            # Extracting positions with their associated minion ids
+            # Extract the positions and their associated minion IDs.
             positions_data = {}
             for position in positions:
                 positions_data[position.position_number] = list(position.minions.values_list('minion_id', flat=True))
 
+            # Append formation details to the response data list.
             response['data'].append({
                 'formation_id': formation.formation_id,
                 'name': formation.name,
@@ -400,9 +528,11 @@ def formation_list(request):
                 'positions': positions_data
             })
 
+        # Update the response code and message to indicate success.
         response['code'] = 200
         response['message'] = 'Success'
 
+    # If there's any exception during the above operations, capture and return the error details.
     except Exception as e:
         response['code'] = 500
         response['message'] = f'Error: {str(e)}'
@@ -411,6 +541,16 @@ def formation_list(request):
 
 
 def formation_remove(request):
+    """
+    Remove a formation identified by its ID from the database.
+
+    Parameters:
+    - request: Django HTTP request object. Expected GET parameter:
+               - id: The ID of the formation to be removed.
+
+    Returns:
+    - JsonResponse: A JSON response indicating the result of the deletion process.
+    """
     response = {
         'code': 404,
         'message': 'Not Found',
@@ -418,45 +558,61 @@ def formation_remove(request):
     }
     id = request.GET.get('id')
     if id:
-        # 删除formation和关联的数据
         try:
+            # Retrieve and delete the formation by its ID.
             formation = FormationModel.objects.get(formation_id=id)
+            formation.delete()
             response['code'] = 200
             response['message'] = 'Success'
-            formation.delete()
 
         except:
             response['code'] = 500
-            response['message'] = 'Error in remove formation'
+            response['message'] = 'Error in removing formation'
 
     return JsonResponse(response)
 
 
 def cards_management(request):
     """
-    卡片管理
+    Render a card management page with available stars, factions, and features.
+
+    Parameters:
+    - request: Django HTTP request object.
+
+    Returns:
+    - HttpResponse: Rendered HTML template for card management.
     """
     context = {}
-
     context['stars'] = (1, 2, 3, 4, 5, 6)
     context['factions'] = FACTION_CHOICES
 
-    # get features
+    # Retrieve all available features.
     context['features'] = FeatureModel.objects.all()
 
     return render(request, 'cards/management.html', context)
 
 
 def cards_multimodify(request):
-    # get state[n]
+    """
+    Update multiple cards' attributes and potentially associate them with a specific feature.
+
+    Parameters:
+    - request: Django HTTP POST request. The request body should contain details of the cards
+               and optionally a feature ID to be associated with selected cards.
+
+    Returns:
+    - HttpResponse: Rendered HTML template showing a message about the operation's result.
+    """
     cards = {}
     cards_ids = []
+
+    # Extract card details from the request POST data.
     for key, rowset in request.POST.items():
         key_row = key.split('_')
         if len(key_row) > 1:
             key_int = int(key_row[1])
-            cards_ids.append(key_int);
-            if not key_int in cards:
+            cards_ids.append(key_int)
+            if key_int not in cards:
                 cards[key_int] = {}
             if key_row[0] == 'name':
                 cards[key_int]['name'] = rowset
@@ -465,42 +621,53 @@ def cards_multimodify(request):
             elif key_row[0] == 'desc':
                 cards[key_int]['desc'] = rowset
 
+    # Check if a feature is specified and retrieve it.
     feature_id = request.POST.get('feature', None)
-    if feature_id is None:
-        feature = None
-    else:
-        feature = FeatureModel.objects.get(feature_id=feature_id)
+    feature = FeatureModel.objects.get(feature_id=feature_id) if feature_id else None
 
-    if len(cards_ids) > 0:
+    if cards_ids:
+        # Retrieve and update minions/cards based on the given details.
         minions = MinionModel.objects.filter(minion_id__in=cards_ids)
-        # check modified
         for minion in minions:
             to_update = False
             if minion.desc != cards[minion.minion_id]['desc']:
                 to_update = True
                 minion.desc = cards[minion.minion_id]['desc']
-
             if minion.name != cards[minion.minion_id]['name']:
                 to_update = True
                 minion.name = cards[minion.minion_id]['name']
 
+            # Save the updated card details.
             if to_update:
-                print(f"({minion.minion_id}) {minion.name} updated.")
                 minion.save()
 
+            # Associate the card with the specified feature, if applicable.
             if int(cards[minion.minion_id]['state']) == 1 and feature:
-                print(f"({minion.minion_id}) state: {cards[minion.minion_id]['state']}. update featue:{feature} {feature.feature_id}")
                 minion.features.add(feature)
 
     message = {
         'title': 'Success',
         'message': 'Successfully updated cards.',
         'url': '/cards/management',
-        'timeout': 5,
+        'timeout': 2,
     }
     return render(request, 'message.html', message)
 
+
 def equipment_list(request):
+    """
+    Retrieve a list of equipment based on filters provided in the request.
+
+    Parameters:
+    - request: Django HTTP request object. Possible GET parameters include:
+               - stars[]: List of star ratings to filter equipment.
+               - query: Text to filter equipment by name or description.
+               - feature: Feature to filter equipment.
+               - order_by: Ordering mechanism (either 'stars' or 'stars-desc').
+
+    Returns:
+    - JsonResponse: A JSON response containing the list of equipment and metadata.
+    """
     response = {
         'code': 200,
         'message': 'OK',
@@ -508,20 +675,25 @@ def equipment_list(request):
     }
 
     try:
+        # Filter valid equipment.
         equipments = EquipmentModel.objects.filter(is_valid=1)
 
+        # Apply filtering based on stars if provided.
         stars = request.GET.getlist('stars[]')
         if stars:
             equipments = equipments.filter(stars__in=stars)
 
+        # Filter equipment based on query string in either name or description.
         query = request.GET.get('query')
         if query:
             equipments = equipments.filter(Q(name__icontains=query) | Q(desc__icontains=query))
 
+        # Filter equipment based on associated feature.
         feature = request.GET.get('feature')
         if feature:
-            minions = equipments.filter(features__feature=feature)
+            equipments = equipments.filter(features__feature=feature)
 
+        # Sort the equipment based on the provided ordering mechanism or default to 'stars'.
         order_by = request.GET.get('order_by')
         if order_by:
             if order_by == 'stars':
@@ -531,6 +703,7 @@ def equipment_list(request):
         else:
             equipments = equipments.order_by('stars')
 
+        # Prepare the data for the response.
         response['data'] = [{
             'equipment_id': equipment.equipment_id,
             'name': equipment.name,
@@ -547,18 +720,93 @@ def equipment_list(request):
     response['count'] = len(response['data'])
     return JsonResponse(response)
 
-def equipment_management(request):
-    context = {}
 
+def equipment_management(request):
+    """
+    Render an equipment management page with available stars, factions, and features.
+
+    Parameters:
+    - request: Django HTTP request object.
+
+    Returns:
+    - HttpResponse: Rendered HTML template for equipment management.
+    """
+    context = {}
     context['stars'] = (1, 2, 3, 4, 5, 6)
     context['factions'] = FACTION_CHOICES
 
-    # get features
+    # Retrieve all available features.
     context['features'] = FeatureModel.objects.all()
 
     return render(request, 'equipment/management.html', context)
-def equipment_multimodify(request):
-    message = {
 
+
+def equipment_multimodify(request):
+    """
+    Modify multiple equipment records based on POST data.
+
+    Parameters:
+    - request: Django HTTP request object with POST data containing:
+               - Key-value pairs of equipment attributes to modify.
+               - Feature ID to potentially associate with the equipment.
+
+    Returns:
+    - HttpResponse: Rendered HTML message indicating success or failure.
+    """
+
+    # Parsing POST data to extract equipment details for modifications.
+    cards = {}
+    cards_ids = []
+    for key, rowset in request.POST.items():
+        key_row = key.split('_')
+        if len(key_row) > 1:
+            key_int = int(key_row[1])
+            cards_ids.append(key_int)
+            if not key_int in cards:
+                cards[key_int] = {}
+            if key_row[0] == 'name':
+                cards[key_int]['name'] = rowset
+            elif key_row[0] == 'state':
+                cards[key_int]['state'] = rowset
+            elif key_row[0] == 'desc':
+                cards[key_int]['desc'] = rowset
+
+    # Retrieve feature based on provided feature ID.
+    feature_id = request.POST.get('feature', None)
+    feature = FeatureModel.objects.get(feature_id=feature_id) if feature_id else None
+
+    # If there are any equipment IDs to modify, process them.
+    if cards_ids:
+        equipments = EquipmentModel.objects.filter(equipment_id__in=cards_ids)
+        for equipment in equipments:
+            to_update = False
+
+            # Check if equipment's description has changed.
+            if equipment.desc != cards[equipment.equipment_id]['desc']:
+                to_update = True
+                equipment.desc = cards[equipment.equipment_id]['desc']
+
+            # Check if equipment's name has changed.
+            if equipment.name != cards[equipment.equipment_id]['name']:
+                to_update = True
+                equipment.name = cards[equipment.equipment_id]['name']
+
+            # If any changes detected, save the equipment.
+            if to_update:
+                print(f"({equipment.equipment_id}) {equipment.name} updated.")
+                equipment.save()
+
+            # If state equals 1 and there's a feature, add the feature to the equipment.
+            if int(cards[equipment.equipment_id]['state']) == 1 and feature:
+                print(
+                    f"({equipment.equipment_id}) state: {cards[equipment.equipment_id]['state']}. update featue:{feature} {feature.feature_id}")
+                equipment.features.add(feature)
+
+    # Return a message indicating successful update.
+    message = {
+        'title': 'Success',
+        'message': 'Successfully updated cards.',
+        'url': '/equipment/management',
+        'timeout': 2,
     }
     return render(request, 'message.html', message)
