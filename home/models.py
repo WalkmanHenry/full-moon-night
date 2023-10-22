@@ -1,19 +1,26 @@
 from django.db import models
 from itertools import chain, combinations
 
+# Choices for image initialization status
 INITIALED_CHOICES = [
     (-1, 'Uninitialized'),
     (0, 'Initializing'),
     (1, 'Initialed'),
 ]
+
+# Choices for checking status
 CHECKED_CHOICES = [
     (-1, 'Unchecked'),
     (1, 'Checked'),
 ]
+
+# Choices for validation status
 VALID_CHOICES = [
     (-1, 'Invalid'),
     (1, 'Valid'),
 ]
+
+# Choices for faction types
 FACTION_CHOICES = [
     (1, '中立'),
     (2, '战士'),
@@ -39,9 +46,7 @@ class ImageModel(models.Model):
     image_id = models.AutoField(primary_key=True)
     file_path = models.CharField(max_length=255, unique=True)
     alias = models.CharField(max_length=255)
-    # 1=valid, -1=invalid
     is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
-    # 1=initialed, -1=uninitialed
     is_initialed = models.SmallIntegerField(choices=INITIALED_CHOICES, default=-1)
 
     def __str__(self):
@@ -53,23 +58,23 @@ class ImageModel(models.Model):
 
 class MinionModel(models.Model):
     """
-    This model represents a minion with certain attributes and features.
+    This model represents a minion with attributes and features.
 
     Fields:
     - name: The name of the minion.
     - attack: The attack value of the minion.
     - health: The health value of the minion.
     - desc: A description of the minion.
-    - image: A path to an image representing the minion.
-    - stars: A value representing the rarity or power level of the minion.
-    - features: The features associated with the minion (ManyToMany relationship with FeatureModel).
-    - is_valid: Indicates whether the minion is valid (1) or invalid (-1).
-    - is_checked: Indicates whether the minion has been checked (1) or unchecked (-1).
+    - image: An image representing the minion.
+    - stars: The rarity or power level of the minion.
+    - features: Features associated with the minion (ManyToMany with FeatureModel).
+    - is_valid: Indicates if the minion is valid (1) or invalid (-1).
+    - is_checked: Indicates if the minion has been checked (1) or unchecked (-1).
     """
 
     minion_id = models.AutoField(primary_key=True)
+    ocrname = models.CharField(max_length=255, default='')
     name = models.CharField(max_length=255, default='')
-    # faction = models.CharField(max_length=255, default='Neutral')
     faction = models.SmallIntegerField(choices=FACTION_CHOICES, default=0)
     attack = models.SmallIntegerField(default=0)
     health = models.SmallIntegerField(default=0)
@@ -77,31 +82,18 @@ class MinionModel(models.Model):
     image = models.CharField(max_length=255, default='')
     stars = models.SmallIntegerField(default=0)
     features = models.ManyToManyField('FeatureModel', related_name='minions', blank=True, null=True)
-
-
-    # 1=valid, -1=invalid
     is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
-    # 1=checked, -1=unchecked
     is_checked = models.SmallIntegerField(choices=CHECKED_CHOICES, default=-1)
 
     @classmethod
     def generate_combinations_and_offsets(cls, factions):
         """
-        根据给定的 factions 列表，生成所有可能的组合和对应的偏移值。
-            factions = [1, 2, 6]
-            offset_values = generate_combinations_and_offsets(factions)
+        Generate all possible combinations and offsets for given factions.
 
-            # 输出所有可能的组合和对应的偏移值
-            for combo, offset in offset_values.items():
-                print(f"{combo}: {offset}")
-
-        :param factions: 一个整数列表，表示 faction。
-        :return: 一个字典，其中键是字符串格式的组合，值是该组合对应的偏移值。
+        :param factions: List of integers representing factions.
+        :return: A dictionary with string formatted combinations as keys and offsets as values.
         """
-        # 获取所有可能的组合，不包括空集
         faction_combinations = chain.from_iterable(combinations(factions, r) for r in range(1, len(factions) + 1))
-
-        # 计算每个组合的偏移值
         offset_values = []
         for combo in faction_combinations:
             offset_value = MinionModel.generate_factions_code(combo)
@@ -123,11 +115,11 @@ class MinionModel(models.Model):
 
 class FeatureModel(models.Model):
     """
-    This model represents a feature that can be associated with minions.
+    Model representing a feature that can be associated with minions.
 
     Fields:
-    - feature: A short code representing the feature.
-    - functional: A description of the functionality associated with the feature.
+    - feature: A code representing the feature.
+    - functional: A description of the functionality of the feature.
     """
 
     feature_id = models.AutoField(primary_key=True)
@@ -154,26 +146,65 @@ class FormationModel(models.Model):
 
 
 class PositionModel(models.Model):
+    """
+    Represents a specific position within a formation.
+
+    Each formation have 6 positions.
+    """
+
+    # Unique ID for the position
     position_id = models.AutoField(primary_key=True)
-    formation = models.ForeignKey(FormationModel, on_delete=models.CASCADE)  # 外键，连接到FormationModel
-    position_number = models.PositiveIntegerField()  # 位置编号（1-6）
-    minions = models.ManyToManyField('MinionModel')  # 多对多关系，一个位置可以有多个随从
+
+    # A foreign key linking to the FormationModel, representing the formation this position belongs to
+    formation = models.ForeignKey(FormationModel, on_delete=models.CASCADE)
+
+    # Represents the position number (e.g., 1-6) within a formation
+    position_number = models.PositiveIntegerField()
+
+    # Many-to-many relationship: One position can be associated with multiple minions
+    minions = models.ManyToManyField('MinionModel')
+
+    # Many-to-many relationship: One position can be associated with multiple equipments
+    equipments = models.ManyToManyField('EquipmentModel')
 
     class Meta:
         db_table = 'fmn_position'
-        unique_together = ['formation', 'position_number']  # (formation, position_number)的组合必须是唯一的
+
+        # Ensures that each position number is unique within a specific formation
+        unique_together = ['formation', 'position_number']
 
 
 class EquipmentModel(models.Model):
+    """
+    Represents an equipment item.
+
+    Each equipment has a name, description, star rating, and can be associated with multiple features.
+    Equipment can also be flagged as valid/invalid and checked/unchecked.
+    """
+
+    # Unique ID for the equipment
     equipment_id = models.AutoField(primary_key=True)
+
+    # Name of the equipment
     name = models.CharField(max_length=255, default='')
+    ocrname = models.CharField(max_length=255, default='')
+
+    # Description of the equipment
     desc = models.CharField(max_length=255, default='')
+
+    # Star rating of the equipment (e.g., 2 stars)
     stars = models.SmallIntegerField(default=2)
+
+    # Many-to-many relationship: An equipment item can be associated with multiple features
     features = models.ManyToManyField('FeatureModel', related_name='equipment')
+
+    # Image associated with the equipment
     image = models.CharField(max_length=255, default='')
-    # 1=valid, -1=invalid
+
+    # Flag to indicate if the equipment is valid (1) or invalid (-1)
     is_valid = models.SmallIntegerField(choices=VALID_CHOICES, default=1)
-    # 1=checked, -1=unchecked
+
+    # Flag to indicate if the equipment has been checked (1) or unchecked (-1)
     is_checked = models.SmallIntegerField(choices=CHECKED_CHOICES, default=-1)
 
     class Meta:

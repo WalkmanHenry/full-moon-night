@@ -4,18 +4,20 @@
 {% block title %}Image Management{% endblock %}
 {% block content %}
     <div class="container-fluid py-4">
-        <div class="row">
+
+        <div class="row" id="minions-panel">
             <div class="col-lg-3">
                 <div class="card">
                     <div class="card-header pb-0">
-                        <h5>Filter</h5>
+                        <h5>Minions / <a href="#" style="color:dodgerblue;"
+                                         onclick="togglePanel('equipment')">Equipment</a></h5>
                         <div class="row">
-                            <button type="submit" id="submit-filter" class="btn btn-primary">Search</button>
+                            <button type="submit" id="minions-filter" class="btn btn-primary">Search Minions</button>
                         </div>
                     </div>
                     <div class="card-body" style="padding-top: 0px">
                         <div class="row">
-                            <form id="filter-form" class="col-12">
+                            <form id="minions-filter-form" class="col-12">
                                 <div class="mb-3">
                                     <label class="form-label">Search (Name/Description)</label>
                                     <input type="text" name="query" autocomplete="off">
@@ -67,7 +69,7 @@
 
                 </div>
             </div>
-            <div class="col-lg-9">
+            <div class="col-lg-9" id="minions">
                 <div class="card">
                     <div class="card-header pb-0">
                         <div class="row">
@@ -80,7 +82,79 @@
                     </div>
 
                     <div class="card-body ">
-                        <div class="row" id="cards-main" ondrop="drop_to_main(event, this)"
+                        <div class="row" id="minions-main" ondrop="drop_to_main(event, this)"
+                             ondragover="allowDrop(event)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row" id="equipment-panel" style="display: none">
+            <div class="col-lg-3">
+                <div class="card">
+                    <div class="card-header pb-0">
+                        <h5><a href="#" style="color:dodgerblue;" onclick="togglePanel('minions')">Minions</a> /
+                            Equipment</h5>
+                        <div class="row">
+                            <button type="submit" id="submit-filter" class="btn btn-primary">Search</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding-top: 0px">
+                        <div class="row">
+                            <form id="equipment-filter-form" class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Search (Name/Description)</label>
+                                    <input type="text" name="query" autocomplete="off">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Feature</label>
+                                    <select class="form-select" id="form-features" name="feature">
+                                        <option value="">All</option>
+                                        {% for feature in features %}
+                                            <option value="{{ feature.feature }}">{{ feature.feature }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Stars</label>
+                                    {% for star in stars %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="{{ star }}"
+                                                   checked="checked" name="stars[]">
+                                            <label class="form-check-label" for="star1">{{ star }}</label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Sort</label>
+                                    <select name="order_by">
+                                        <option value="stars">Stars</option>
+                                        <option value="stars-desc">Stars Desc.</option>
+                                        <option value="faction">Faction</option>
+                                        <option value="faction-desc">Faction, Stars Desc</option>
+                                    </select>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="col-lg-9" id="minions">
+                <div class="card">
+                    <div class="card-header pb-0">
+                        <div class="row">
+                            <div class="col-lg-6 col-7">
+                                <p class="text-sm mb-0">
+                                    {{ attachment_path }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body ">
+                        <div class="row" id="equipment-main" ondrop="drop_to_main(event, this)"
                              ondragover="allowDrop(event)">
                         </div>
                     </div>
@@ -170,6 +244,24 @@
 <!-- Specific JS goes HERE -->
 {% block scripts %}
     <script>
+
+        /**
+         * Toggle panel between minions and equipment
+         * @param panel {minions|equipment}
+         */
+        function togglePanel(panel) {
+            switch (panel) {
+                case  "minions":
+                    $("#equipment-panel").hide();
+                    $("#minions-panel").show();
+                    break;
+                case "equipment":
+                default:
+                    $("#minions-panel").hide();
+                    $("#equipment-panel").show();
+            }
+        }
+
         function allowDrop(ev) {
             ev.preventDefault(); // Prevent default behavior when dropping
         }
@@ -180,6 +272,13 @@
             ev.dataTransfer.setData("parentId", ev.target.parentNode.id);
         }
 
+        /**
+         * Drag end event,
+         * 1.Get the original parent id
+         * 2.Get the original parent element by id
+         * 3.Gets the element of the dragged item using its ID.
+         * @param ev
+         */
         function dragEnd(ev) {
             var origParentId = ev.dataTransfer.getData("parentId");
             var origParent = document.getElementById(origParentId);
@@ -187,6 +286,14 @@
             if (origParent && origImage) origParent.removeChild(origImage);
         }
 
+        /**
+         * When any image drops to the main panel,
+         * check if it is a valid minion and if so,
+         * add it to the minions/equipment (main) panel.
+         *
+         * @param ev
+         * @returns void
+         */
         function drop_to_main(ev) {
             ev.preventDefault();
             var data = ev.dataTransfer.getData("text");
@@ -194,7 +301,7 @@
             var origParent = document.getElementById(origParentId);
             var origImage = document.getElementById(data);
             // 如果是从主容器拖到主容器则放弃操作
-            if (origParentId == "cards-main") {
+            if (origParentId == "minions-main" || origParentId == "equipment-main") {
                 console.log("drop to main");
                 return false;
             }
@@ -206,9 +313,15 @@
             } else {
                 console.log('查看：', origImage);
             }
-            loadSingleCard(minion_id, src, $('#cards-main'));
+            loadSingleCard(minion_id, src, $('#minions-main'));
         }
 
+        /**
+         * Load image in formation area when dropped.
+         *
+         * @param ev
+         * @param dropzone
+         */
         function drop(ev, dropzone) {
             ev.preventDefault();
             var data = ev.dataTransfer.getData("text");
@@ -234,6 +347,15 @@
         }
 
 
+        /**
+         * The process of dragging an image.
+         * 1. Add dragend event listener to the image
+         * 2. Append the image to the dropzone
+         * 3. Makes the image stackable
+         *
+         * @param dropzone
+         * @param imgElement
+         */
         function loadImage(dropzone, imgElement) {
             imgElement.addEventListener('dragend', dragEnd);
             dropzone.appendChild(imgElement);
@@ -254,7 +376,8 @@
         }
 
         $(document).ready(function () {
-            loadCards();
+            loadMinions();
+            loadEquiment();
 
             $('#save-formation').click(function () {
                 var formationData = {};
@@ -294,7 +417,11 @@
                 });
             });
 
-            $('#filter-form').submit(function (e) {
+            /**
+             * Serialize the form data and submit to the backend.
+             * Stop the form from submitting by preventDefault().
+             */
+            $('#minions-filter-form').submit(function (e) {
                 e.preventDefault();
                 var filters = {};
                 $(this).serializeArray().forEach(function (field) {
@@ -307,14 +434,14 @@
                         filters[field.name] = field.value;
                     }
                 });
-                loadCards(filters);
+                loadMinions(filters);
             });
 
 
-            $('#submit-filter').click(function (e) {
+            // Bind the filter button of minions list
+            $('#minions-filter').click(function (e) {
                 e.preventDefault(); // 阻止表单的默认提交行为
-
-                $('#filter-form').submit(); // 手动触发表单的 submit 事件
+                $('#minions-filter-form').submit(); // 手动触发表单的 submit 事件
             });
 
             document.addEventListener('keydown', function (event) {
@@ -332,26 +459,52 @@
             });
         });
 
-        function loadSingleCard(minion_id, ImgSrc, container) {
-            var imgId = 'card-' + minion_id;
-            var col = $('<img draggable="true" class="col-lg-2" ondragstart="drag(event)" style="border-radius:unset; padding-bottom: 10px;flex: 0 0 auto; width: 16.66%;">').attr('id', imgId).add('card_id', minion_id).attr('src', ImgSrc).addClass('card-img');
+        function loadSingleCard(card_id, ImgSrc, container) {
+            var imgId = container.attr("id").replace(/-/g, '') + '-' + card_id;
+            var col = $('<img draggable="true" class="col-lg-2" ondragstart="drag(event)" style="border-radius:unset; padding-bottom: 10px;flex: 0 0 auto; width: 16.66%;">').attr('id', imgId).add('card_id', card_id).attr('src', ImgSrc).addClass('card-img');
             container.append(col);
         }
 
-        function loadCards(filters) {
+        function loadMinions(filters) {
+            loadCards(filters, 'minions');
+        }
+
+        function loadEquiment(filters) {
+            loadCards(filters, 'equipment');
+        }
+
+        /**
+         * Load cards from server by filters.
+         *
+         * @param filters {minions|equipment}
+         * @param cardType
+         */
+        function loadCards(filters, cardType = 'minions') {
+            // check card type and initialize fetch url and container
+            var fetchUrl = '/cards/list';
+            var container = $('#minions-main');
+            if (cardType === 'equipment') {
+                fetchUrl = '/equipment/list';
+                container = $('#equipment-main');
+            }
             $.ajax({
-                url: '/cards/list',
+                url: fetchUrl,
                 type: 'GET',
                 data: filters, // 将过滤条件传递给服务器
                 dataType: 'json',
                 success: function (response) {
                     if (response.code === 200) {
                         var cards = response.data;
-                        var container = $('#cards-main');
                         container.empty();
-
                         $.each(cards, function (index, card) {
-                            loadSingleCard(card.minion_id, '/' + card.image, container)
+                            if (cardType == 'equipment') {
+                                var cardId = card.equipment_id;
+                                var cardImg = card.image;
+                            } else {
+                                var cardId = card.minion_id;
+                                var cardImg = card.image;
+                            }
+                            loadSingleCard(cardId, cardImg, container)
                         });
                     } else {
                         console.error('Request failed with message: ' + response.message);

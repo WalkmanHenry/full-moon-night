@@ -167,6 +167,7 @@ def initial_image_task(image_id):
 
             card_data = MinionModel.objects.create(
                 name=card_dict['name'],
+                ocrname=card_dict['name'],
                 desc=card_dict['desc'],
                 faction=faction,
                 attack=card_dict['attack'],
@@ -220,6 +221,7 @@ def initial_image_task(image_id):
             # 创建装备牌数据
             equipment_data = EquipmentModel.objects.create(
                 name=equipment_dict['name'],
+                ocrname=equipment_dict['name'],
                 desc=equipment_dict['desc'],
                 stars=equipment_dict['star'],
                 is_valid=1,

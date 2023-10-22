@@ -190,6 +190,12 @@
         }
 
 
+        /**
+         * Load image in formation area when dropped.
+         *
+         * @param ev
+         * @param dropzone
+         */
         function drop(ev, dropzone) {
             ev.preventDefault();
             var data = ev.dataTransfer.getData("text");
@@ -214,13 +220,28 @@
             loadImage(dropzone, imgElement);
         }
 
-
+        /**
+         * The process of dragging an image.
+         * 1. Add dragend event listener to the image
+         * 2. Append the image to the dropzone
+         * 3. Makes the image stackable
+         *
+         * @param dropzone
+         * @param imgElement
+         */
         function loadImage(dropzone, imgElement) {
             imgElement.addEventListener('dragend', dragEnd);
             dropzone.appendChild(imgElement);
             updateImageStyles(dropzone.id)
         }
 
+        /**
+         * Makes cards can be stacked.
+         * Updates the image styles when an image is dropped.
+         *
+         * @param container_id
+         * @returns void
+         */
         function updateImageStyles(container_id = 'position1') {
             if (container_id.split('-').length > 1) {
                 return false;
@@ -237,8 +258,11 @@
         $(document).ready(function () {
             loadCards();
 
+            // Save formation button binding
             $('#save-formation').click(function () {
+                // initialize data to post
                 var formationData = {};
+                // get position 1-6 cards set data
                 for (var i = 1; i <= 6; i++) {
                     var containerId = 'position' + i;
                     var container = document.getElementById(containerId);
@@ -249,8 +273,10 @@
                         formationData[containerId].push(imgId);
                     }
                 }
+                // formation name
                 formationData['name'] = $('#formation_name').val();
 
+                // important: csrf token
                 var csrfToken = $('[name="csrfmiddlewaretoken"]').val();
 
                 $.ajax({
@@ -259,6 +285,7 @@
                     headers: {
                         'X-CSRFToken': csrfToken
                     },
+                    // jsonize data
                     data: JSON.stringify(formationData),
                     contentType: 'application/json; charset=utf-8',
                     dataType: 'json',
@@ -275,6 +302,12 @@
                 });
             });
 
+            /**
+             * Minion cards filter
+             *
+             * bind
+             *   - filter form submit
+             */
             $('#filter-form').submit(function (e) {
                 e.preventDefault();
                 var filters = {};
@@ -325,7 +358,7 @@
             var field_name = $('<input type="text" class="form-control" name="name_' + card.minion_id + '" value="' + card.name + '" />');
             var field_desc = $('<textarea class="form-control" name="desc_' + card.minion_id + '" style="font-size: 10px">' + card.desc + '</textarea>');
             var hiddenInput = $('<input type="hidden" name="state_' + card.minion_id + '" value="-1" />');
-            var field_image = $('<img ondragstart="drag(event)" style="border-radius:unset;flex: 0 0 auto; width: 100%;">').attr('id', card.minion_id).add('card_id', card.minion_id).attr('src', '/' + card.image).addClass('card-img');
+            var field_image = $('<img ondragstart="drag(event)" style="border-radius:unset;flex: 0 0 auto; width: 100%;">').attr('id', 'card-' + card.minion_id).add('card_id', card.minion_id).attr('src', '/' + card.image).addClass('card-img');
             field_image.click(function () {
                 var inputValue = parseInt(hiddenInput.val());
                 if (inputValue === -1) {
@@ -345,6 +378,11 @@
             container.append(col);
         }
 
+        /**
+         * Loads the list of cards from the server
+         *
+         * @param filters
+         */
         function loadCards(filters) {
             $.ajax({
                 url: '/cards/list',
