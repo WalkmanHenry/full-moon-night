@@ -4,6 +4,8 @@ import os, json, traceback
 
 # Import Django-specific utilities and functions.
 from django.core.exceptions import ObjectDoesNotExist
+from django.forms.models import model_to_dict
+
 from django.db import connection
 from django.conf import settings
 from django.db.models import Q
@@ -11,6 +13,9 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
 
 # Import utility functions from the specified modules.
 from admin_soft.utils import JsonResponse
@@ -180,7 +185,7 @@ def imgmanagement_imageinit(request):
     }
     response = {
         'code': 404,
-        'message': 'not found',
+        'message': 'Not Found',
     }
 
     try:
@@ -379,17 +384,35 @@ def formation_save(request):
         # Parse JSON data from the request body
         data = json.loads(request.body.decode('utf-8'))
 
+        formation_id = data.get('formation_id', None)
+
+        # Check if formation_id exists in the database
+        existing_formation = None
+        if formation_id:
+            try:
+                existing_formation = FormationModel.objects.get(formation_id=formation_id)
+            except FormationModel.DoesNotExist:
+                pass
+
+        # Determine whether to create or update based on the presence of formation_id and its existence in the database
+        if existing_formation:
+            save_model = 'update'
+            formation = existing_formation
+        else:
+            save_model = 'create'
+
         # Get formation name from data; default to 'Another Formation' if not provided
         name = data.get('name', 'Another Formation')
 
         # Collect all minion IDs from the provided formation data
         all_minion_ids = []
+        all_equipment_ids = []
 
         # Filter out the 'name' key and only consider position-related keys
-        filtered_data = {position_number: minion_ids for position_number, minion_ids in data.items() if
-                         position_number != 'name'}
-        for position_number, minion_ids in filtered_data.items():
-            all_minion_ids.extend(minion_ids)
+        for position_key, position_data in data.items():
+            if "position" in position_key:
+                all_minion_ids.extend(position_data.get('minions', []))
+                all_equipment_ids.extend(position_data.get('equipments', []))
 
         # If no minions are provided, return an error response
         if not all_minion_ids:
@@ -408,8 +431,19 @@ def formation_save(request):
         # Compute a unique integer representing the involved factions
         faction_int = sum([10 ** (x - 1) for x in unique_factions])
 
-        # Create a new formation record with the given name, factions, and search name
-        formation = FormationModel.objects.create(name=name, factions=faction_int, search_minion=search_name)
+        if save_model == 'create':
+            # Create a new formation record with the given name, factions, and search name
+            formation = FormationModel.objects.create(name=name, factions=faction_int, search_minion=search_name)
+        else:
+            # Updating an existing formation
+            formation.name = name
+            formation.factions = faction_int
+            formation.search_minion = search_name
+            formation.save()
+
+            # Remove old position data related to this formation
+            PositionModel.objects.filter(formation=formation).delete()
+
 
     except (json.JSONDecodeError, TypeError):
         # If there's an error in parsing the JSON data, return an error response
@@ -417,25 +451,25 @@ def formation_save(request):
         return JsonResponse(response)
 
     # Loop over each position in the filtered data to create position records
-    for position_number, minion_ids in filtered_data.items():
-        try:
-            # Convert position string (e.g., 'position1') to an integer
-            position_number = int(position_number.replace('position', ''))
-        except ValueError:
-            response['message'] = 'Bad Request: No minion in formation'
-            return JsonResponse(response)
+    for position_key, position_data in data.items():
+        if "position" in position_key:
+            try:
+                position_number = int(position_key.replace('position', ''))
+            except ValueError:
+                response['message'] = 'Bad Request: Invalid position number'
+                return JsonResponse(response)
 
-        try:
-            # Fetch minions for the current position
-            minions = MinionModel.objects.filter(minion_id__in=minion_ids)
-        except ObjectDoesNotExist:
-            response['code'] = 404
-            response['message'] = 'Not found: No minion found.'
-            return JsonResponse(response)
+            try:
+                minions = MinionModel.objects.filter(minion_id__in=position_data.get('minions', []))
+                equipments = EquipmentModel.objects.filter(equipment_id__in=position_data.get('equipments', []))
+            except ObjectDoesNotExist:
+                response['code'] = 404
+                response['message'] = 'Not Found: No minion or equipment found.'
+                return JsonResponse(response)
 
-        # Create a position record for the current formation and set the minions to it
-        position = PositionModel.objects.create(formation=formation, position_number=position_number)
-        position.minions.set(minions)
+            position = PositionModel.objects.create(formation=formation, position_number=position_number)
+            position.minions.set(minions)
+            position.equipments.set(equipments)  # Save the relationship with equipments
 
     # If everything went well, set the response to indicate success
     response['code'] = 200
@@ -489,6 +523,12 @@ def formation_list(request):
         # Create a dictionary mapping minion IDs to their associated image.
         response['minions'] = {minion.minion_id: minion.image for minion in minions}
 
+        # Retrieve all equipments from the database.
+        equipments = EquipmentModel.objects.all()
+
+        # Create a dictionary mapping equipment IDs to their associated image.
+        response['equipments'] = {equipment.equipment_id: equipment.image for equipment in equipments}
+
         # Retrieve factions from request parameters.
         factions = request.GET.getlist('faction[]')
         factions_in = MinionModel.generate_combinations_and_offsets(factions)
@@ -518,7 +558,11 @@ def formation_list(request):
             # Extract the positions and their associated minion IDs.
             positions_data = {}
             for position in positions:
-                positions_data[position.position_number] = list(position.minions.values_list('minion_id', flat=True))
+                positions_data[position.position_number] = []
+                positions_data[position.position_number].append(
+                    list(position.minions.values_list('minion_id', flat=True)))
+                positions_data[position.position_number].append(
+                    list(position.equipments.values_list('equipment_id', flat=True)))
 
             # Append formation details to the response data list.
             response['data'].append({
@@ -536,6 +580,66 @@ def formation_list(request):
     except Exception as e:
         response['code'] = 500
         response['message'] = f'Error: {str(e)}'
+
+    return JsonResponse(response)
+
+
+def formation_get(request):
+    formation_id = request.GET.get('id')
+    response = {
+        'code': 404,
+        'message': 'Not Found',
+    }
+
+    # 尝试获取指定ID的阵型
+    formation = get_object_or_404(FormationModel, formation_id=formation_id)
+
+    # 提取阵型中的每个位置的数据
+    positions_data = []
+    positions = PositionModel.objects.filter(formation=formation).prefetch_related('minions', 'minions__features',
+                                                                                   'equipments', 'equipments__features')
+
+    for position in positions:
+        position_dict = {
+            'position_number': position.position_number,
+            'minions': [],
+            'equipments': []
+        }
+
+        # 提取每个位置上的随从数据和与随从关联的特征数据
+        for minion in position.minions.all():
+            features = [feature.feature for feature in minion.features.all()]
+            position_dict['minions'].append({
+                'id': minion.minion_id,
+                'name': minion.name,
+                'attack': minion.attack,
+                'health': minion.health,
+                'desc': minion.desc,
+                'stars': minion.stars,
+                'features': features,
+                'image': minion.image
+            })
+
+        # 提取每个位置上的装备数据和与装备关联的特征数据
+        for equipment in position.equipments.all():
+            features = [feature.feature for feature in equipment.features.all()]
+            position_dict['equipments'].append({
+                'id': equipment.equipment_id,
+                'name': equipment.name,
+                'desc': equipment.desc,
+                'stars': equipment.stars,
+                'features': features,
+                'image': equipment.image
+            })
+
+        positions_data.append(position_dict)
+
+    response['code'] = 200
+    response['message'] = 'Success'
+    response['data'] = {
+        'formation_name': formation.name,
+        'positions': positions_data
+    }
 
     return JsonResponse(response)
 

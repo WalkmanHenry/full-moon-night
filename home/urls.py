@@ -25,5 +25,6 @@ urlpatterns = [
     path('formation', views.formation_index, name='formation_index'),
     path('formation/save', views.formation_save, name='formation_save'),
     path('formation/list', views.formation_list, name='formation_list'),
+    path('formation/get', views.formation_get, name='formation_get'),
     path('formation/remove', views.formation_remove, name='formation_remove'),
 ]
