@@ -102,6 +102,7 @@
                     <div class="card-body" style="padding-top: 0px">
                         <div class="row">
                             <form id="equipment-filter-form" class="col-12">
+                                <input type="hidden" name="formation_id" value="">
                                 <div class="mb-3">
                                     <label class="form-label">Search (Name/Description)</label>
                                     <input type="text" name="query" autocomplete="off">
@@ -191,10 +192,14 @@
                 </div>
                 <div class="row" style="padding: 20px 8px;">
                     <div class="col">
-                        <input type="text" placeholder="阵容名称" name="name" id="formation_name" autocomplete="off">
+                        <input type="text" placeholder="Formation name" name="name" id="formation_name"
+                               autocomplete="off">
                     </div>
-                    <div class="col">
-                        <button id="save-formation" class="btn btn-primary ">保存阵容</button>
+                    <div class="col" id="form-buttons">
+                        <button id="save-formation" class="btn btn-primary ">Save</button>
+                        <button id="button_reset" class="btn btn-info" style="margin-left: 10px; display: none;">
+                            Reset
+                        </button>
                     </div>
                 </div>
             </div>
@@ -327,14 +332,8 @@
             var data = ev.dataTransfer.getData("text");
             var src = ev.dataTransfer.getData("src");
 
-            var imgElement = document.createElement("img");
-            imgElement.src = src;
-            imgElement.id = 'formationimg-' + data.split('-')[1];
-            imgElement.ondragstart = function (ev) {
-                drag(ev);
-            }; // Correctly assign drag event
-            imgElement.draggable = "true";
-            imgElement.classList.add('card-img');
+            // create image element
+            var imgElement = create_formation_item(data, src, ev);
 
             var origParentId = ev.dataTransfer.getData("parentId");
             var origParent = document.getElementById(origParentId);
@@ -344,6 +343,26 @@
                 updateImageStyles(origParentId)
             }
             loadImage(dropzone, imgElement);
+        }
+
+        /**
+         * Create a new image to insert into the formation area.
+         *
+         * @param id
+         */
+        function create_formation_item(id, src, ev = null) {
+            var imgElement = document.createElement("img");
+            imgElement.src = src;
+            imgElement.id = 'formationimg-' + id;
+            if (ev) {
+                // Correctly assign drag event
+                imgElement.ondragstart = function (ev) {
+                    drag(ev);
+                };
+            }
+            imgElement.draggable = "true";
+            imgElement.classList.add('card-img');
+            return imgElement;
         }
 
 
@@ -362,6 +381,11 @@
             updateImageStyles(dropzone.id)
         }
 
+        /**
+         * Makes the image stackable.
+         * @param container_id
+         * @returns void
+         */
         function updateImageStyles(container_id = 'position1') {
             if (container_id.split('-').length > 1) {
                 return false;
@@ -375,21 +399,73 @@
             }
         }
 
+        /**
+         * Loads the formation images to formation zone.
+         *
+         * @param formation_id
+         */
+        function load_formation(formation_id) {
+            // get data from /formation/get?id=formation_id
+            $.get('/formation/get?id=' + formation_id, function (result) {
+                $('#formation_id').val(formation_id);
+                $("#formation_name").val(result.data.formation_name)
+                // iterator positions
+                for (var i = 0; i < result.data.positions.length; i++) {
+                    var dropzone = document.getElementById("position" + result.data.positions[i].position_number);
+                    dropzone.innerHTML = "";
+                    // iterator minions
+                    for (var j = 0; j < result.data.positions[i].minions.length; j++) {
+                        var id = result.data.positions[i].minions[j].id;
+                        var image_src = "/" + result.data.positions[i].minions[j].image;
+                        var imgElement = create_formation_item(id, image_src);
+                        loadImage(dropzone, imgElement);
+                    }
+                }
+
+                $('#button_reset').show();
+                // build button html
+                if (typeof button_new === "undefined") {
+                    console.log('create button new');
+                    button_reset = '';
+                    $('#form-buttons').append(button_reset);
+
+                } else {
+                }
+
+            });
+        }
+
         $(document).ready(function () {
             loadMinions();
             loadEquiment();
 
             $('#save-formation').click(function () {
                 var formationData = {};
+
                 for (var i = 1; i <= 6; i++) {
                     var containerId = 'position' + i;
                     var container = document.getElementById(containerId);
                     var imgs = container.getElementsByTagName('img');
-                    formationData[containerId] = [];
+
+                    // Initialize minion and equipment arrays for this position
+                    var minions = [];
+                    var equipments = [];
+
                     for (var j = 0; j < imgs.length; j++) {
-                        var imgId = imgs[j].id.split('-')[1]; // Assuming id is in the 'formationimg-ID' format
-                        formationData[containerId].push(imgId);
+                        var type = imgs[j].id.split('-')[1];
+                        var imgId = imgs[j].id.split('-')[2];
+
+                        if (type == "minionsmain") {
+                            minions.push(imgId);
+                        } else {
+                            equipments.push(imgId);
+                        }
                     }
+
+                    formationData[containerId] = {
+                        "minions": minions,
+                        "equipments": equipments
+                    };
                 }
                 formationData['name'] = $('#formation_name').val();
 
@@ -417,6 +493,15 @@
                 });
             });
 
+            $('#button_reset').click(function () {
+                for (var i = 1; i < 7; i++) {
+                    var dropzone = document.getElementById("position" + i);
+                    dropzone.innerHTML = "";
+                }
+                $('#formation_name').val('');
+                $('#button_reset').hide();
+            });
+
             /**
              * Serialize the form data and submit to the backend.
              * Stop the form from submitting by preventDefault().
@@ -440,8 +525,11 @@
 
             // Bind the filter button of minions list
             $('#minions-filter').click(function (e) {
-                e.preventDefault(); // 阻止表单的默认提交行为
-                $('#minions-filter-form').submit(); // 手动触发表单的 submit 事件
+                // disable the button default behavior
+                e.preventDefault();
+
+                // submit the form
+                $('#minions-filter-form').submit();
             });
 
             document.addEventListener('keydown', function (event) {

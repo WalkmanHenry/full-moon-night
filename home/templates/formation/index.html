@@ -239,7 +239,7 @@
                         const formations = response.data;
                         // 对 formations 进行操作，比如渲染到页面上。
                         formations.forEach(function (formation) {
-                            append_formation(formation, response.minions);
+                            append_formation(formation, response.minions, response.equipments);
                         });
                     } else {
                         console.error('请求失败：' + response.message);
@@ -251,7 +251,7 @@
             });
         }
 
-        function append_formation(formation, minions) {
+        function append_formation(formation, minions, equipments) {
             // 定义模板
             let template = `
         <div class="col-6 formation-card" id="formation_card_${formation.formation_id}">
@@ -274,11 +274,17 @@
                     template += `<svg class="formation-image bd-placeholder-img card-img-top" width="100%" height="180" xmlns="http://www.w3.org/2000/svg" role="img" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="95%" fill="#f9f9f9"></rect></svg>`;
                 } else {
                     i = 0;
-                    formation.positions[position].forEach(function (value) {
+                    formation.positions[position][0].forEach(function (value) {
                         zIndex = i + 1;
                         top_px = i * 9;
                         i += 1;
                         template += `<img class="formation-image" style="z-index: ${zIndex}; top: ${top_px}%;" src="/${minions[value]}">`;
+                    });
+                    formation.positions[position][1].forEach(function (value) {
+                        zIndex = i + 1;
+                        top_px = i * 9;
+                        i += 1;
+                        template += `<img class="formation-image" style="z-index: ${zIndex}; top: ${top_px}%;" src="/${equipments[value]}">`;
                     });
                 }
                 template += `</div>`;
