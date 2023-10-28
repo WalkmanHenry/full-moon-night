@@ -305,20 +305,26 @@
             var origParentId = ev.dataTransfer.getData("parentId");
             var origParent = document.getElementById(origParentId);
             var origImage = document.getElementById(data);
-            // 如果是从主容器拖到主容器则放弃操作
+            // If it is dragged from the main panel to the main panel, give up the operation
             if (origParentId == "minions-main" || origParentId == "equipment-main") {
                 console.log("drop to main");
                 return false;
             }
-            var minion_id = data.split("_")[1];
+            var card_info = data.split("-");
+            // To distinguish whether it is a card or equipment
+            var card_type = card_info[card_info.length-2];
+            var card_id = card_info[data.split("-").length-1];
             var src = ev.dataTransfer.getData("src");
             if (origParent && origImage) {
                 origParent.removeChild(origImage);
                 updateImageStyles(origParentId)
-            } else {
-                console.log('查看：', origImage);
             }
-            loadSingleCard(minion_id, src, $('#minions-main'));
+
+            if (card_type == "equipmentmain") {
+                loadSingleCard(card_id, src, $('#equipment-main'));
+            }else{
+                loadSingleCard(card_id, src, $('#minions-main'));
+            }
         }
 
         /**
@@ -351,6 +357,9 @@
          * @param id
          */
         function create_formation_item(id, src, ev = null) {
+            if (id.startsWith('formationimg-')) {
+                id = id.slice('formationimg-'.length);
+            }
             var imgElement = document.createElement("img");
             imgElement.src = src;
             imgElement.id = 'formationimg-' + id;
@@ -453,7 +462,7 @@
 
                     for (var j = 0; j < imgs.length; j++) {
                         var type = imgs[j].id.split('-')[1];
-                        var imgId = imgs[j].id.split('-')[2];
+                        var imgId = imgs[j].id.split('-')[-1];
 
                         if (type == "minionsmain") {
                             minions.push(imgId);
